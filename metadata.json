@@ -1,0 +1,6 @@
+{
+  "name": "Hexaflow: Hexa Sort Puzzle",
+  "description": "Tablet-optimised casual 3D hexagonal colour sorting and merging puzzle game with campaign, daily challenges, endless and relax modes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

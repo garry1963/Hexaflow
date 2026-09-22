@@ -1,0 +1,1221 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  ActiveGameState,
+  BoardCell,
+  BoardState,
+  BoosterType,
+  CascadeTransfer,
+  GameMode,
+  HexColorId,
+  LevelData,
+  PlayerProfile,
+  GameSettings,
+  GameStats,
+  TileStack,
+  TileStackLayer,
+} from './types';
+import { CAMPAIGN_LEVELS } from './data/levels';
+import { generateHexHoneycomb } from './utils/hexMath';
+import {
+  executeMoveAndCascade,
+  getValidTargetCells,
+} from './utils/gameLogic';
+import {
+  dateToSeed,
+  generateProceduralLevel,
+} from './utils/levelGenerator';
+import {
+  clearAllGameData,
+  loadActiveGame,
+  loadProfile,
+  loadSettings,
+  loadStats,
+  loadUnlockedAchievements,
+  saveActiveGame,
+  saveProfile,
+  saveSettings,
+  saveStats,
+  saveUnlockedAchievements,
+} from './utils/storage';
+import { soundManager } from './audio/soundManager';
+
+// Components
+import { MainMenu } from './components/MainMenu';
+import { HexBoard } from './components/HexBoard';
+import { TraySlot } from './components/TraySlot';
+import { HexTileStack } from './components/HexTileStack';
+import { HUD } from './components/HUD';
+import { LevelCompleteModal } from './components/LevelCompleteModal';
+import { LevelFailedModal } from './components/LevelFailedModal';
+import { PauseModal } from './components/PauseModal';
+import { LevelSelectModal } from './components/LevelSelectModal';
+import { DailyChallengeModal } from './components/DailyChallengeModal';
+import { WeeklyChallengeModal } from './components/WeeklyChallengeModal';
+import { AchievementsModal } from './components/AchievementsModal';
+import { StatsModal } from './components/StatsModal';
+import { SettingsModal } from './components/SettingsModal';
+import { DevToolsModal } from './components/DevToolsModal';
+import { TutorialModal } from './components/TutorialModal';
+import { Hammer, Sparkles } from 'lucide-react';
+
+interface UndoSnapshot {
+  board: BoardState;
+  tray: (TileStack | null)[];
+  incomingQueue: { color: HexColorId; count: number; layers?: TileStackLayer[] }[];
+  score: number;
+  movesMade: number;
+  movesRemaining?: number;
+  combo: number;
+  completedColors: { [color: string]: number };
+  unlockedCells: string[];
+}
+
+function generateRandomTrayStack(
+  availableColors: HexColorId[],
+  levelId: number,
+  slotIndex: number
+): TileStack {
+  const maxLayers = levelId >= 5 ? Math.min(3, availableColors.length) : 1;
+  const numLayers = maxLayers > 1 ? 1 + Math.floor(Math.random() * maxLayers) : 1;
+
+  const shuffledColors = [...availableColors].sort(() => Math.random() - 0.5);
+  const pickedColors = shuffledColors.slice(0, numLayers);
+
+  const layers = pickedColors.map((color) => ({
+    color,
+    count: 2 + Math.floor(Math.random() * 3), // 2 to 4 tiles per layer
+  }));
+
+  const totalCount = layers.reduce((s, l) => s + l.count, 0);
+  const topColor = layers[layers.length - 1].color;
+
+  return {
+    id: `tray_gen_${Date.now()}_${slotIndex}`,
+    color: topColor,
+    count: totalCount,
+    layers,
+  };
+}
+
+export default function App() {
+  // Navigation & View States
+  const [activeView, setActiveView] = useState<'menu' | 'game'>('menu');
+  const [gameMode, setGameMode] = useState<GameMode>('campaign');
+
+  // Persistence States
+  const [profile, setProfile] = useState<PlayerProfile>(loadProfile);
+  const [stats, setStats] = useState<GameStats>(loadStats);
+  const [settings, setSettings] = useState<GameSettings>(loadSettings);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>(
+    loadUnlockedAchievements
+  );
+
+  // Active Game Level & Board State
+  const [currentLevelId, setCurrentLevelId] = useState<number>(1);
+  const [levelData, setLevelData] = useState<LevelData>(CAMPAIGN_LEVELS[0]);
+  const [boardCells, setBoardCells] = useState<BoardCell[]>([]);
+  const [boardState, setBoardState] = useState<BoardState>({});
+  const [tray, setTray] = useState<(TileStack | null)[]>([null, null, null]);
+  const [incomingQueue, setIncomingQueue] = useState<
+    { color: HexColorId; count: number; layers?: TileStackLayer[] }[]
+  >([]);
+
+  // Selection & Interactivity (Only tray stacks can be moved to board)
+  const [selectedSource, setSelectedSource] = useState<{
+    type: 'tray';
+    index: number;
+    stack: TileStack;
+  } | null>(null);
+  const [dragState, setDragState] = useState<{
+    sourceType: 'tray';
+    sourceIndex: number;
+    stack: TileStack;
+    currentX: number;
+    currentY: number;
+    isDragging: boolean;
+  } | null>(null);
+  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
+  const dragRef = useRef<{
+    sourceType: 'tray';
+    sourceIndex: number;
+    stack: TileStack;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    isDragging: boolean;
+  } | null>(null);
+
+  const [activeBoosterMode, setActiveBoosterMode] = useState<BoosterType | null>(
+    null
+  );
+
+  // Dynamic Neighbor Waterfall Cascade Stream & Move Lock
+  const [activeTransfers, setActiveTransfers] = useState<CascadeTransfer[]>([]);
+  const [isProcessingMove, setIsProcessingMove] = useState<boolean>(false);
+  const moveTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+
+  const clearMoveTimeouts = useCallback(() => {
+    moveTimeoutsRef.current.forEach(clearTimeout);
+    moveTimeoutsRef.current = [];
+  }, []);
+
+  // Safety Watchdog: Prevent game from ever freezing on move processing
+  useEffect(() => {
+    if (!isProcessingMove) return;
+    const watchdog = setTimeout(() => {
+      setIsProcessingMove(false);
+      setActiveTransfers([]);
+    }, 2400);
+    return () => clearTimeout(watchdog);
+  }, [isProcessingMove]);
+
+  // Clean up all pending timeouts on unmount
+  useEffect(() => {
+    return () => clearMoveTimeouts();
+  }, [clearMoveTimeouts]);
+
+  // Scores & Objectives
+  const [score, setScore] = useState<number>(0);
+  const [movesMade, setMovesMade] = useState<number>(0);
+  const [movesRemaining, setMovesRemaining] = useState<number | undefined>(undefined);
+  const [timeRemaining, setTimeRemaining] = useState<number | undefined>(undefined);
+  const [combo, setCombo] = useState<number>(1);
+  const [completedColorCounts, setCompletedColorCounts] = useState<{
+    [color: string]: number;
+  }>({});
+  const [unlockedCells, setUnlockedCells] = useState<string[]>([]);
+
+  // Modals & Status
+  const [isComplete, setIsComplete] = useState<boolean>(false);
+  const [isFailed, setIsFailed] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [earnedStars, setEarnedStars] = useState<number>(1);
+
+  // Secondary Dialogs
+  const [showLevelSelect, setShowLevelSelect] = useState(false);
+  const [showDailyModal, setShowDailyModal] = useState(false);
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDevTools, setShowDevTools] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // Undo History
+  const [undoHistory, setUndoHistory] = useState<UndoSnapshot[]>([]);
+
+  // Show tutorial on first launch if player has no completed levels
+  useEffect(() => {
+    try {
+      const hasSeen = localStorage.getItem('hexaflow_tutorial_seen');
+      const completedCount = Object.keys(profile.completedLevels).length;
+      if (!hasSeen && completedCount === 0 && profile.xp === 0) {
+        setShowTutorial(true);
+        localStorage.setItem('hexaflow_tutorial_seen', 'true');
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, []);
+
+  // Sync sound settings to sound manager
+  useEffect(() => {
+    soundManager.setSoundEnabled(settings.soundEnabled);
+    soundManager.setMusicEnabled(settings.musicEnabled);
+  }, [settings.soundEnabled, settings.musicEnabled]);
+
+  // Save profile and stats changes
+  useEffect(() => {
+    saveProfile(profile);
+  }, [profile]);
+
+  useEffect(() => {
+    saveStats(stats);
+  }, [stats]);
+
+  useEffect(() => {
+    saveSettings(settings);
+  }, [settings]);
+
+  // Load level and initialize board
+  const startLevel = useCallback(
+    (lvl: LevelData, mode: GameMode = 'campaign') => {
+      clearMoveTimeouts();
+      setIsProcessingMove(false);
+      setActiveTransfers([]);
+      soundManager.playButton();
+      setLevelData(lvl);
+      setGameMode(mode);
+      setCurrentLevelId(lvl.id);
+
+      // Generate board cells based on radius or customCells
+      const generated = generateHexHoneycomb(lvl.boardRadius);
+      const cellsMap = new Map<string, BoardCell>();
+      generated.forEach((c) => cellsMap.set(c.id, c));
+
+      // Merge custom cells (blocked, locked, restricted colors, bonus cells)
+      if (lvl.customCells) {
+        lvl.customCells.forEach((c) => {
+          cellsMap.set(c.id, { ...cellsMap.get(c.id), ...c });
+        });
+      }
+      const finalCells = Array.from(cellsMap.values());
+      setBoardCells(finalCells);
+
+      // Initialize board stacks
+      const initialBoard: BoardState = {};
+      finalCells.forEach((c) => (initialBoard[c.id] = null));
+      lvl.startingBoard.forEach((s) => {
+        const layers =
+          s.layers && s.layers.length > 0
+            ? s.layers
+            : [{ color: s.color, count: s.count }];
+        const topColor = layers[layers.length - 1].color;
+        const totalCount = layers.reduce((acc, l) => acc + l.count, 0);
+
+        initialBoard[s.cellId] = {
+          id: `starting_${s.cellId}`,
+          color: topColor,
+          count: totalCount,
+          layers,
+        };
+      });
+      setBoardState(initialBoard);
+
+      // Queue of incoming pieces
+      const pool = [...lvl.incomingPool];
+      const initialTray: (TileStack | null)[] = [];
+      for (let i = 0; i < 3; i++) {
+        if (pool.length > 0) {
+          const item = pool.shift()!;
+          const layers =
+            item.layers && item.layers.length > 0
+              ? item.layers
+              : [{ color: item.color, count: item.count }];
+          const topColor = layers[layers.length - 1].color;
+          const totalCount = layers.reduce((acc, l) => acc + l.count, 0);
+
+          initialTray.push({
+            id: `tray_${Date.now()}_${i}`,
+            color: topColor,
+            count: totalCount,
+            layers,
+          });
+        } else {
+          initialTray.push(
+            generateRandomTrayStack(lvl.availableColors, lvl.id, i)
+          );
+        }
+      }
+      setTray(initialTray);
+      setIncomingQueue(pool);
+
+      // Reset gameplay counters
+      setScore(0);
+      setMovesMade(0);
+      setMovesRemaining(mode === 'relax' ? undefined : lvl.objective.moveLimit);
+      setTimeRemaining(lvl.objective.timeLimitSeconds);
+      setCombo(1);
+      setCompletedColorCounts({});
+      setUnlockedCells([]);
+      setSelectedSource(null);
+      setActiveBoosterMode(null);
+      setIsComplete(false);
+      setIsFailed(false);
+      setIsPaused(false);
+      setUndoHistory([]);
+
+      setActiveView('game');
+    },
+    []
+  );
+
+  // Check level completion or failure after moves
+  const checkGameRules = useCallback(
+    (
+      currentScore: number,
+      currentMovesRemaining: number | undefined,
+      currentCompletedColors: { [color: string]: number },
+      currentBoard: BoardState
+    ) => {
+      const obj = levelData.objective;
+      let won = false;
+
+      if (obj.type === 'complete_colors' && obj.targetColors) {
+        won = Object.entries(obj.targetColors).every(([color, req]) => {
+          return (currentCompletedColors[color] || 0) >= (req || 1);
+        });
+      } else if (obj.type === 'target_score' && obj.targetScore) {
+        won = currentScore >= obj.targetScore;
+      } else if (obj.type === 'clear_board') {
+        const remainingTiles = Object.values(currentBoard).filter(Boolean);
+        won = remainingTiles.length === 0;
+      } else if (obj.type === 'limited_moves' && obj.targetColors) {
+        won = Object.entries(obj.targetColors).every(([color, req]) => {
+          return (currentCompletedColors[color] || 0) >= (req || 1);
+        });
+      }
+
+      if (won) {
+        // Calculate stars
+        let stars = 1;
+        if (currentScore >= levelData.starThresholds[2]) stars = 3;
+        else if (currentScore >= levelData.starThresholds[1]) stars = 2;
+
+        setEarnedStars(stars);
+        setIsComplete(true);
+
+        const coinsAwarded = 100 + stars * 25;
+        const xpAwarded = 25 + stars * 15;
+
+        // Update profile
+        setProfile((prev) => {
+          const prevCompleted = prev.completedLevels[levelData.id];
+          const newBestScore = Math.max(
+            prevCompleted?.bestScore || 0,
+            currentScore
+          );
+          const newBestStars = Math.max(prevCompleted?.stars || 0, stars);
+
+          return {
+            ...prev,
+            coins: prev.coins + coinsAwarded,
+            xp: prev.xp + xpAwarded,
+            level: Math.floor((prev.xp + xpAwarded) / 100) + 1,
+            stars: prev.stars + (newBestStars - (prevCompleted?.stars || 0)),
+            currentLevel:
+              gameMode === 'campaign' && levelData.id === prev.currentLevel
+                ? Math.min(prev.currentLevel + 1, 20)
+                : prev.currentLevel,
+            completedLevels: {
+              ...prev.completedLevels,
+              [levelData.id]: {
+                stars: newBestStars,
+                bestScore: newBestScore,
+                bestMoves: Math.min(
+                  prevCompleted?.bestMoves || 999,
+                  movesMade + 1
+                ),
+              },
+            },
+          };
+        });
+
+        // Update stats
+        setStats((prev) => ({
+          ...prev,
+          totalGamesPlayed: prev.totalGamesPlayed + 1,
+          highestScore: Math.max(prev.highestScore, currentScore),
+          dailyChallengesCompleted:
+            gameMode === 'daily'
+              ? prev.dailyChallengesCompleted + 1
+              : prev.dailyChallengesCompleted,
+        }));
+
+        saveActiveGame(null);
+        return;
+      }
+
+      // Check failure (moves exhausted)
+      if (currentMovesRemaining !== undefined && currentMovesRemaining <= 0) {
+        soundManager.playInvalid();
+        setIsFailed(true);
+        saveActiveGame(null);
+      }
+    },
+    [levelData, gameMode, movesMade]
+  );
+
+  // Execute Placement Logic (Only tray stacks can be placed onto board)
+  const executePlacement = (
+    targetCell: BoardCell,
+    source: {
+      type: 'tray';
+      index: number;
+      stack: TileStack;
+    }
+  ): boolean => {
+    const validTargets = getValidTargetCells(
+      source.stack,
+      boardCells,
+      boardState,
+      levelData.stackCapacity,
+      unlockedCells
+    );
+
+    if (!validTargets.includes(targetCell.id)) {
+      soundManager.playInvalid();
+      return false;
+    }
+
+    // Save undo snapshot before applying move
+    setUndoHistory((prev) => [
+      ...prev.slice(-9), // retain up to 10 undo steps
+      {
+        board: { ...boardState },
+        tray: [...tray],
+        incomingQueue: [...incomingQueue],
+        score,
+        movesMade,
+        movesRemaining,
+        combo,
+        completedColors: { ...completedColorCounts },
+        unlockedCells: [...unlockedCells],
+      },
+    ]);
+
+    // Execute placement and cascading neighbor merge (only from tray)
+    const result = executeMoveAndCascade(
+      source.stack,
+      targetCell,
+      boardState,
+      tray,
+      source.index,
+      null,
+      boardCells,
+      levelData.stackCapacity,
+      unlockedCells
+    );
+
+    // Audio and transfers feedback
+    if (result.mergesCount > 0) {
+      soundManager.playMerge(0.6);
+      const nextCombo = combo + 1;
+      setCombo(nextCombo);
+      soundManager.playCombo(nextCombo);
+
+      if (result.transfers && result.transfers.length > 0) {
+        soundManager.playTileWhoosh();
+        setActiveTransfers(result.transfers);
+      }
+    } else {
+      soundManager.playPlace();
+      setCombo(1);
+    }
+
+    // Refill tray if a tray slot was emptied
+    const nextTray = [...result.nextTray];
+    const nextQueue = [...incomingQueue];
+    if (source.type === 'tray' && source.index !== undefined) {
+      if (nextQueue.length > 0) {
+        const nextPiece = nextQueue.shift()!;
+        const pieceLayers =
+          nextPiece.layers && nextPiece.layers.length > 0
+            ? nextPiece.layers
+            : [{ color: nextPiece.color, count: nextPiece.count }];
+        const topColor = pieceLayers[pieceLayers.length - 1].color;
+        const totalCount = pieceLayers.reduce((s: number, l: TileStackLayer) => s + l.count, 0);
+
+        nextTray[source.index] = {
+          id: `tray_${Date.now()}_${source.index}`,
+          color: topColor,
+          count: totalCount,
+          layers: pieceLayers,
+        };
+      } else {
+        nextTray[source.index] = generateRandomTrayStack(
+          levelData.availableColors,
+          levelData.id,
+          source.index
+        );
+      }
+    }
+
+    // Update state
+    const nextScore = score + result.scoreGained * (combo > 1 ? combo : 1);
+    const nextMovesMade = movesMade + 1;
+    const nextMovesRemaining =
+      movesRemaining !== undefined ? Math.max(0, movesRemaining - 1) : undefined;
+
+    const nextCompletedColors = { ...completedColorCounts };
+    result.completedColors.forEach((c) => {
+      nextCompletedColors[c] = (nextCompletedColors[c] || 0) + 1;
+    });
+
+    setBoardState(result.nextBoard);
+    setTray(nextTray);
+    setIncomingQueue(nextQueue);
+    setScore(nextScore);
+    setMovesMade(nextMovesMade);
+    setMovesRemaining(nextMovesRemaining);
+    setCompletedColorCounts(nextCompletedColors);
+    setUnlockedCells(result.unlockedCells);
+    setSelectedSource(null);
+
+    // Update stats
+    setStats((prev) => ({
+      ...prev,
+      totalMoves: prev.totalMoves + 1,
+      totalMerges: prev.totalMerges + result.mergesCount,
+      totalCompletedStacks:
+        prev.totalCompletedStacks + result.completedColors.length,
+      highestCombo: Math.max(prev.highestCombo, combo + (result.mergesCount > 0 ? 1 : 0)),
+      highestScore: Math.max(prev.highestScore, nextScore),
+    }));
+
+    // Calculate total duration for transfers to land and stack smoothly
+    const transferCount = result.transfers?.reduce((acc, t) => Math.max(acc, t.count), 0) || 0;
+    const hasTransfers = transferCount > 0;
+    const transferFlightDurationMs = hasTransfers ? (transferCount - 1) * 70 + 440 : 0;
+
+    if (result.isComplete) {
+      setIsProcessingMove(true);
+
+      const triggerCompletionDissolve = () => {
+        // Play celebratory chime and mark target stack as clearing with crown & burst
+        soundManager.playCompleteStack();
+        setBoardState((prev) => ({
+          ...prev,
+          [targetCell.id]: {
+            ...(prev[targetCell.id] || result.nextBoard[targetCell.id]!),
+            isCompleted: true,
+            animating: 'clearing',
+          },
+        }));
+        setActiveTransfers([]);
+
+        // After celebratory burst & dissolve (440ms), update to remaining stack & release lock
+        const finishTimer = setTimeout(() => {
+          const clearedBoard = {
+            ...result.nextBoard,
+            [targetCell.id]: result.remainingTargetStack ?? null,
+          };
+          setBoardState(clearedBoard);
+          setIsProcessingMove(false);
+
+          // Check objectives after clearing
+          checkGameRules(
+            nextScore,
+            nextMovesRemaining,
+            nextCompletedColors,
+            clearedBoard
+          );
+        }, 440);
+        moveTimeoutsRef.current.push(finishTimer);
+      };
+
+      if (hasTransfers) {
+        // Wait for cascade chips to fly and land on the stack before triggering completion
+        const cascadeTimer = setTimeout(() => {
+          triggerCompletionDissolve();
+        }, transferFlightDurationMs);
+        moveTimeoutsRef.current.push(cascadeTimer);
+      } else {
+        // Direct complete without waterfall flight (immediate celebration burst)
+        triggerCompletionDissolve();
+      }
+    } else {
+      if (hasTransfers) {
+        setIsProcessingMove(true);
+        const endTransferTimer = setTimeout(() => {
+          setActiveTransfers([]);
+          setIsProcessingMove(false);
+          checkGameRules(
+            nextScore,
+            nextMovesRemaining,
+            nextCompletedColors,
+            result.nextBoard
+          );
+        }, transferFlightDurationMs);
+        moveTimeoutsRef.current.push(endTransferTimer);
+      } else {
+        setIsProcessingMove(false);
+        // Immediate check objectives
+        checkGameRules(
+          nextScore,
+          nextMovesRemaining,
+          nextCompletedColors,
+          result.nextBoard
+        );
+      }
+    }
+
+    return true;
+  };
+
+  // Handle Board Cell Click
+  const handleCellClick = (cell: BoardCell) => {
+    if (isProcessingMove || isPaused || isFailed || isComplete) return;
+    // If in Hammer mode: smash the stack on this cell!
+    if (activeBoosterMode === 'hammer') {
+      const stack = boardState[cell.id];
+      if (stack) {
+        soundManager.playBooster();
+        setBoardState((prev) => ({ ...prev, [cell.id]: null }));
+        setActiveBoosterMode(null);
+        setProfile((prev) => ({
+          ...prev,
+          boosters: { ...prev.boosters, hammer: Math.max(0, prev.boosters.hammer - 1) },
+        }));
+      }
+      return;
+    }
+
+    // Normal move: Only allow placing a stack selected from the tray
+    if (selectedSource && selectedSource.type === 'tray') {
+      executePlacement(cell, selectedSource);
+      return;
+    }
+
+    // Board tiles cannot be selected or moved!
+  };
+
+  // Handle Drag & Drop with Pointer Events (from Tray to Board only)
+  const handleDragStart = (
+    e: React.PointerEvent,
+    slotIdx: number,
+    stack: TileStack
+  ) => {
+    if (isProcessingMove || isPaused || isFailed || isComplete) return;
+    if (activeBoosterMode === 'hammer') return;
+
+    // Immediately select source so valid targets highlight
+    setSelectedSource({
+      type: 'tray',
+      index: slotIdx,
+      stack,
+    });
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    dragRef.current = {
+      sourceType: 'tray',
+      sourceIndex: slotIdx,
+      stack,
+      startX,
+      startY,
+      currentX: startX,
+      currentY: startY,
+      isDragging: false,
+    };
+
+    const onPointerMove = (ev: PointerEvent) => {
+      if (!dragRef.current) return;
+      const dx = ev.clientX - dragRef.current.startX;
+      const dy = ev.clientY - dragRef.current.startY;
+      const dist = Math.hypot(dx, dy);
+
+      const isDragging = dragRef.current.isDragging || dist > 6;
+      dragRef.current.isDragging = isDragging;
+      dragRef.current.currentX = ev.clientX;
+      dragRef.current.currentY = ev.clientY;
+
+      if (isDragging) {
+        // Find cell under pointer
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const cellEl = el?.closest('[data-cell-id]');
+        const targetId = cellEl?.getAttribute('data-cell-id') || null;
+        setHoveredCellId(targetId);
+      }
+
+      setDragState({ ...dragRef.current });
+    };
+
+    const onPointerUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+
+      const activeDrag = dragRef.current;
+      dragRef.current = null;
+      setHoveredCellId(null);
+      setDragState(null);
+
+      if (!activeDrag) return;
+
+      if (activeDrag.isDragging) {
+        // Find cell under pointer
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const cellEl = el?.closest('[data-cell-id]');
+        const targetId = cellEl?.getAttribute('data-cell-id');
+
+        if (targetId) {
+          const targetCell = boardCells.find((c) => c.id === targetId);
+          if (targetCell) {
+            const success = executePlacement(targetCell, {
+              type: 'tray',
+              index: activeDrag.sourceIndex,
+              stack: activeDrag.stack,
+            });
+            if (success) {
+              setSelectedSource(null);
+              return;
+            }
+          }
+        }
+        // Dropped in invalid area
+        soundManager.playButton();
+        setSelectedSource(null);
+      } else {
+        // Was a simple tap/click
+        soundManager.playSelect();
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  };
+
+  // Handle Tray Slot Click
+  const handleTraySelect = (index: number) => {
+    if (isProcessingMove || isPaused || isFailed || isComplete) return;
+    const stack = tray[index];
+    if (!stack) return;
+
+    if (
+      selectedSource?.type === 'tray' &&
+      selectedSource.index === index
+    ) {
+      // Deselect
+      setSelectedSource(null);
+    } else {
+      soundManager.playSelect();
+      setSelectedSource({
+        type: 'tray',
+        index,
+        stack,
+      });
+    }
+  };
+
+  // Undo Move
+  const handleUndo = () => {
+    if (undoHistory.length === 0) return;
+    clearMoveTimeouts();
+    setIsProcessingMove(false);
+    setActiveTransfers([]);
+    soundManager.playButton();
+
+    const last = undoHistory[undoHistory.length - 1];
+    setBoardState(last.board);
+    setTray(last.tray);
+    setIncomingQueue(last.incomingQueue);
+    setScore(last.score);
+    setMovesMade(last.movesMade);
+    setMovesRemaining(last.movesRemaining);
+    setCombo(last.combo);
+    setCompletedColorCounts(last.completedColors);
+    setUnlockedCells(last.unlockedCells);
+    setSelectedSource(null);
+    setIsFailed(false);
+
+    setUndoHistory((prev) => prev.slice(0, -1));
+
+    if (gameMode !== 'relax' && profile.boosters.undo > 0) {
+      setProfile((prev) => ({
+        ...prev,
+        boosters: { ...prev.boosters, undo: Math.max(0, prev.boosters.undo - 1) },
+      }));
+    }
+  };
+
+  // Boosters
+  const handleUseBooster = (type: BoosterType) => {
+    soundManager.playBooster();
+
+    if (type === 'undo') {
+      handleUndo();
+    } else if (type === 'shuffle') {
+      // Re-roll tray
+      const shuffled = tray.map((item, i) => {
+        if (!item) return null;
+        const col =
+          levelData.availableColors[
+            Math.floor(Math.random() * levelData.availableColors.length)
+          ];
+        return {
+          id: `tray_shuffled_${Date.now()}_${i}`,
+          color: col,
+          count: item.count,
+        };
+      });
+      setTray(shuffled);
+      setProfile((prev) => ({
+        ...prev,
+        boosters: { ...prev.boosters, shuffle: Math.max(0, prev.boosters.shuffle - 1) },
+      }));
+    } else if (type === 'hammer') {
+      setActiveBoosterMode('hammer');
+    } else if (type === 'wild_hex') {
+      // Turn selected stack or first tray stack into Wild Rainbow
+      if (selectedSource) {
+        selectedSource.stack.color = 'wild-rainbow';
+        setSelectedSource({ ...selectedSource });
+      } else {
+        const nextTray = [...tray];
+        const firstIdx = nextTray.findIndex((s) => s !== null);
+        if (firstIdx !== -1 && nextTray[firstIdx]) {
+          nextTray[firstIdx] = {
+            ...nextTray[firstIdx]!,
+            color: 'wild-rainbow',
+          };
+          setTray(nextTray);
+        }
+      }
+      setProfile((prev) => ({
+        ...prev,
+        boosters: { ...prev.boosters, wild_hex: Math.max(0, prev.boosters.wild_hex - 1) },
+      }));
+    } else if (type === 'extra_moves') {
+      setMovesRemaining((prev) => (prev !== undefined ? prev + 5 : 5));
+      setIsFailed(false);
+      setProfile((prev) => ({
+        ...prev,
+        boosters: {
+          ...prev.boosters,
+          extra_moves: Math.max(0, prev.boosters.extra_moves - 1),
+        },
+      }));
+    }
+  };
+
+  // Modes Navigation
+  const handleStartMode = (mode: GameMode, levelId: number = 1) => {
+    if (mode === 'campaign') {
+      const lvl = CAMPAIGN_LEVELS[levelId - 1] || CAMPAIGN_LEVELS[0];
+      startLevel(lvl, 'campaign');
+    } else if (mode === 'daily') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const seed = dateToSeed(todayStr);
+      const lvl = generateProceduralLevel(900, "Today's Daily", 3, seed, 'daily');
+      startLevel(lvl, 'daily');
+    } else if (mode === 'weekly') {
+      const weekSeed = dateToSeed(new Date().getFullYear() + '-W' + Math.ceil(new Date().getDate() / 7));
+      const lvl = generateProceduralLevel(950, 'Weekly Mega Challenge', 4, weekSeed, 'weekly');
+      startLevel(lvl, 'weekly');
+    } else if (mode === 'endless') {
+      const lvl = generateProceduralLevel(1, 'Endless Hex', 2, Date.now(), 'endless');
+      startLevel(lvl, 'endless');
+    } else if (mode === 'relax') {
+      const lvl = CAMPAIGN_LEVELS[0];
+      startLevel(lvl, 'relax');
+    }
+  };
+
+  // Valid Drop Target IDs for Board
+  const validTargetIds = selectedSource
+    ? getValidTargetCells(
+        selectedSource.stack,
+        boardCells,
+        boardState,
+        levelData.stackCapacity,
+        unlockedCells
+      )
+    : [];
+
+  return (
+    <div
+      className={`relative w-full h-full min-h-screen flex flex-col items-center justify-between ${
+        settings.darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-900 text-slate-100'
+      } ${settings.highContrast ? 'contrast-125' : ''} select-none overflow-hidden touch-manipulation font-sans`}
+    >
+      {/* View: Main Home Menu */}
+      {activeView === 'menu' && (
+        <MainMenu
+          profile={profile}
+          onStartMode={handleStartMode}
+          onOpenLevelSelect={() => setShowLevelSelect(true)}
+          onOpenAchievements={() => setShowAchievements(true)}
+          onOpenStats={() => setShowStats(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenDaily={() => setShowDailyModal(true)}
+          onOpenWeekly={() => setShowWeeklyModal(true)}
+          onOpenTutorial={() => setShowTutorial(true)}
+        />
+      )}
+
+      {/* View: Active Game Board */}
+      {activeView === 'game' && (
+        <div className="relative w-full h-full min-h-screen flex flex-col justify-between p-3 md:p-6 max-w-5xl mx-auto">
+          {/* Top Tablet HUD */}
+          <HUD
+            level={levelData}
+            mode={gameMode}
+            score={score}
+            movesMade={movesMade}
+            movesRemaining={movesRemaining}
+            timeRemaining={timeRemaining}
+            combo={combo}
+            completedColorCounts={completedColorCounts}
+            boosters={profile.boosters}
+            canUndo={undoHistory.length > 0}
+            onUndo={handleUndo}
+            onUseBooster={handleUseBooster}
+            onOpenPause={() => setIsPaused(true)}
+            onOpenTutorial={() => setShowTutorial(true)}
+            onOpenDevTools={() => setShowDevTools(true)}
+          />
+
+          {/* Active Hammer Mode Banner Notification */}
+          {activeBoosterMode === 'hammer' && (
+            <div className="w-full flex items-center justify-center py-2 px-4 bg-rose-600/90 text-white font-display font-bold text-xs rounded-xl shadow-lg animate-pulse gap-2">
+              <Hammer className="w-4 h-4" />
+              <span>HAMMER ACTIVE: Tap any stack on the board to smash it!</span>
+              <button
+                onClick={() => setActiveBoosterMode(null)}
+                className="underline text-[10px] ml-2"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* Main 3D Hexagonal Honeycomb Board */}
+          <main className="flex-1 flex items-center justify-center my-auto py-2">
+            <HexBoard
+              cells={boardCells}
+              boardState={boardState}
+              hoveredCellId={hoveredCellId}
+              onCellClick={handleCellClick}
+              validTargetIds={validTargetIds}
+              showSymbols={settings.showAccessibilitySymbols}
+              maxCapacity={levelData.stackCapacity}
+              activeTransfers={activeTransfers}
+              onTransfersCompleted={() => setActiveTransfers([])}
+            />
+          </main>
+
+          {/* Bottom Tray Staging Area */}
+          <footer className="w-full flex flex-col items-center gap-2 pb-2">
+            <div className="flex items-center justify-center gap-3 md:gap-6 bg-slate-900/85 backdrop-blur-md p-3 md:p-4 rounded-3xl border border-slate-700/60 shadow-xl">
+              {tray.map((stack, idx) => (
+                <TraySlot
+                  key={idx}
+                  index={idx}
+                  stack={stack}
+                  isSelected={
+                    selectedSource?.type === 'tray' &&
+                    selectedSource.index === idx
+                  }
+                  isDragging={
+                    Boolean(dragState?.isDragging &&
+                    dragState.sourceType === 'tray' &&
+                    dragState.sourceIndex === idx)
+                  }
+                  onSelect={() => handleTraySelect(idx)}
+                  onDragStart={(e, slotIdx, slotStack) =>
+                    handleDragStart(e, slotIdx, slotStack)
+                  }
+                  showSymbols={settings.showAccessibilitySymbols}
+                  maxCapacity={levelData.stackCapacity}
+                />
+              ))}
+            </div>
+
+            <span className="text-[11px] text-slate-400 font-medium">
+              Tap or drag a stack from the tray to an empty cell or matching stack
+            </span>
+          </footer>
+        </div>
+      )}
+
+      {/* Floating Dragged Stack Overlay (Follows finger/pointer) */}
+      {dragState && dragState.isDragging && (
+        <div
+          className="fixed pointer-events-none z-50 transition-none select-none"
+          style={{
+            left: `${dragState.currentX}px`,
+            top: `${dragState.currentY - 32}px`,
+            transform: 'translate(-50%, -50%) scale(1.15)',
+          }}
+        >
+          <div className="filter drop-shadow-[0_20px_35px_rgba(0,0,0,0.7)]">
+            <HexTileStack
+              stack={dragState.stack}
+              size={42}
+              isSelected={true}
+              showSymbol={settings.showAccessibilitySymbols}
+              maxCapacity={levelData.stackCapacity}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      {isComplete && (
+        <LevelCompleteModal
+          level={levelData}
+          score={score}
+          bestScore={profile.completedLevels[levelData.id]?.bestScore || score}
+          movesMade={movesMade}
+          stars={earnedStars}
+          coinsAwarded={100 + earnedStars * 25}
+          xpAwarded={25 + earnedStars * 15}
+          onNextLevel={() => {
+            const nextLvl = CAMPAIGN_LEVELS[levelData.id] || CAMPAIGN_LEVELS[0];
+            startLevel(nextLvl, 'campaign');
+          }}
+          onReplay={() => startLevel(levelData, gameMode)}
+          onLevelSelect={() => {
+            setIsComplete(false);
+            setShowLevelSelect(true);
+          }}
+          hasNextLevel={levelData.id < 20}
+        />
+      )}
+
+      {isFailed && (
+        <LevelFailedModal
+          level={levelData}
+          score={score}
+          boosters={profile.boosters}
+          canUndo={undoHistory.length > 0}
+          onUndo={handleUndo}
+          onUseExtraMoves={() => handleUseBooster('extra_moves')}
+          onUseShuffle={() => handleUseBooster('shuffle')}
+          onRetry={() => startLevel(levelData, gameMode)}
+          onLevelSelect={() => {
+            setIsFailed(false);
+            setShowLevelSelect(true);
+          }}
+        />
+      )}
+
+      {isPaused && (
+        <PauseModal
+          onResume={() => setIsPaused(false)}
+          onRestart={() => {
+            setIsPaused(false);
+            startLevel(levelData, gameMode);
+          }}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenTutorial={() => setShowTutorial(true)}
+          onQuitToMenu={() => {
+            setIsPaused(false);
+            setActiveView('menu');
+          }}
+          confirmRestart={settings.confirmRestart}
+        />
+      )}
+
+      {showLevelSelect && (
+        <LevelSelectModal
+          profile={profile}
+          onSelectLevel={(id) => {
+            setShowLevelSelect(false);
+            const lvl = CAMPAIGN_LEVELS[id - 1];
+            if (lvl) startLevel(lvl, 'campaign');
+          }}
+          onClose={() => setShowLevelSelect(false)}
+        />
+      )}
+
+      {showDailyModal && (
+        <DailyChallengeModal
+          profile={profile}
+          stats={stats}
+          onStartDaily={() => {
+            setShowDailyModal(false);
+            handleStartMode('daily');
+          }}
+          onClose={() => setShowDailyModal(false)}
+        />
+      )}
+
+      {showWeeklyModal && (
+        <WeeklyChallengeModal
+          profile={profile}
+          stats={stats}
+          onStartWeekly={() => {
+            setShowWeeklyModal(false);
+            handleStartMode('weekly');
+          }}
+          onClose={() => setShowWeeklyModal(false)}
+        />
+      )}
+
+      {showAchievements && (
+        <AchievementsModal
+          profile={profile}
+          stats={stats}
+          unlockedIds={unlockedAchievements}
+          onClaimReward={(id, coins, xp) => {
+            soundManager.playBooster();
+            const nextUnlocked = [...unlockedAchievements, id];
+            setUnlockedAchievements(nextUnlocked);
+            saveUnlockedAchievements(nextUnlocked);
+            setProfile((prev) => ({
+              ...prev,
+              coins: prev.coins + coins,
+              xp: prev.xp + xp,
+              level: Math.floor((prev.xp + xp) / 100) + 1,
+            }));
+          }}
+          onClose={() => setShowAchievements(false)}
+        />
+      )}
+
+      {showStats && (
+        <StatsModal
+          profile={profile}
+          stats={stats}
+          onClose={() => setShowStats(false)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          settings={settings}
+          profile={profile}
+          onUpdateSettings={(newSet) => setSettings((prev) => ({ ...prev, ...newSet }))}
+          onUpdateProfileName={(name) => setProfile((prev) => ({ ...prev, name }))}
+          onResetProgress={() => {
+            clearAllGameData();
+            window.location.reload();
+          }}
+          onOpenDevTools={() => setShowDevTools(true)}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showDevTools && (
+        <DevToolsModal
+          currentLevelId={levelData.id}
+          activeLevelData={levelData}
+          onJumpToLevel={(id) => {
+            const lvl = CAMPAIGN_LEVELS[id - 1];
+            if (lvl) startLevel(lvl, 'campaign');
+          }}
+          onAddCurrency={(coins, xp) => {
+            setProfile((prev) => ({
+              ...prev,
+              coins: prev.coins + coins,
+              xp: prev.xp + xp,
+            }));
+          }}
+          onUnlockAllLevels={() => {
+            setProfile((prev) => {
+              const allCompleted: PlayerProfile['completedLevels'] = {};
+              CAMPAIGN_LEVELS.forEach((l) => {
+                allCompleted[l.id] = { stars: 3, bestScore: 5000, bestMoves: 10 };
+              });
+              return {
+                ...prev,
+                currentLevel: 20,
+                stars: 60,
+                completedLevels: allCompleted,
+              };
+            });
+          }}
+          onClose={() => setShowDevTools(false)}
+        />
+      )}
+
+      {showTutorial && (
+        <TutorialModal
+          isOpen={showTutorial}
+          onClose={() => setShowTutorial(false)}
+          onStartGame={() => {
+            setShowTutorial(false);
+            if (activeView !== 'game') {
+              handleStartMode('campaign', profile.currentLevel || 1);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
