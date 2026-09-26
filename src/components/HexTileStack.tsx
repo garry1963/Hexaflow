@@ -16,6 +16,7 @@ interface HexTileStackProps {
   size?: number; // Outer radius of hexagon
   isSelected?: boolean;
   showSymbol?: boolean;
+  showCount?: boolean;
   isDraggable?: boolean;
   onSelect?: () => void;
   onClick?: (e: React.MouseEvent | React.TouchEvent) => void;
@@ -28,6 +29,7 @@ export const HexTileStack: React.FC<HexTileStackProps> = ({
   size = 38,
   isSelected = false,
   showSymbol = true,
+  showCount = true,
   onClick,
   maxCapacity = 10,
 }) => {
@@ -51,9 +53,9 @@ export const HexTileStack: React.FC<HexTileStackProps> = ({
 
   // Number of physical tile slices to draw (1 to 7)
   const visibleLayers = Math.min(Math.max(count, 1), 7);
-  const layerThickness = size > 44 ? 7.2 : 6.0;
-  const rise = size > 44 ? 6.0 : 5.0;
-  const cornerRadius = size * 0.18; // Smooth modern rounded fillets
+  const layerThickness = size > 50 ? 8.2 : size > 42 ? 7.0 : 5.8;
+  const rise = size > 50 ? 6.6 : size > 42 ? 5.6 : 4.6;
+  const cornerRadius = size * 0.16; // Smooth modern rounded fillets
 
   // Allocate which color each of the visible slices represents from bottom to top
   const sliceColors: HexColorId[] = useMemo(() => {
@@ -166,7 +168,7 @@ export const HexTileStack: React.FC<HexTileStackProps> = ({
 
       {/* 3D SVG Render of Physical Stack with Smooth Rounded Corners and Multi-Color Tactile Layers */}
       <svg
-        viewBox={`0 ${-visibleLayers * rise - 6} ${hexW} ${hexH + visibleLayers * rise + 16}`}
+        viewBox={`0 0 ${hexW} ${hexH}`}
         className={`w-full h-full overflow-visible pointer-events-none ${
           isRainbow ? 'animate-rainbow' : ''
         }`}
@@ -363,90 +365,106 @@ export const HexTileStack: React.FC<HexTileStackProps> = ({
       </svg>
 
       {/* Floating Embossed Coin Badge on Top of Stack */}
-      <motion.div
-        className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
-        animate={{
-          y: -(visibleLayers - 1) * rise - (size > 44 ? 3 : 2),
-        }}
-        transition={{
-          y: { type: 'spring', stiffness: 340, damping: 25 },
-        }}
-      >
-        {/* Embossed Tactile Coin Badge */}
-        <div
-          className={`relative flex flex-col items-center justify-center rounded-2xl transition-all duration-200 ${
-            isComplete
-              ? 'bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 ring-2 ring-white shadow-[0_0_18px_rgba(245,158,11,0.95),inset_0_1px_2px_rgba(255,255,255,0.8)] animate-pulse'
-              : 'bg-slate-950/90 text-white backdrop-blur-[4px] ring-1.5 ring-white/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.45),0_4px_10px_rgba(0,0,0,0.75)]'
-          } ${size > 44 ? 'min-w-[36px] py-1 px-2' : 'min-w-[28px] py-0.5 px-1.5'}`}
+      {(showCount || showSymbol || isComplete) && (
+        <motion.div
+          className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+          animate={{
+            y: -(visibleLayers - 1) * rise - (size > 50 ? 4 : size > 40 ? 3 : 2),
+          }}
+          transition={{
+            y: { type: 'spring', stiffness: 340, damping: 25 },
+          }}
         >
-          {/* Subtle metallic glass sheen */}
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-transparent via-white/10 to-white/30 pointer-events-none" />
+          {/* Embossed Tactile Coin Badge */}
+          <div
+            className={`relative flex flex-col items-center justify-center rounded-2xl transition-all duration-200 ${
+              isComplete
+                ? 'bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 ring-2 ring-white shadow-[0_0_18px_rgba(245,158,11,0.95),inset_0_1px_2px_rgba(255,255,255,0.8)] animate-pulse'
+                : 'bg-slate-950/90 text-white backdrop-blur-[4px] ring-1.5 ring-white/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.45),0_4px_10px_rgba(0,0,0,0.75)]'
+            } ${
+              size > 55
+                ? 'min-w-[38px] py-1 px-2.5'
+                : size > 44
+                ? 'min-w-[32px] py-1 px-2'
+                : 'min-w-[24px] py-0.5 px-1.5'
+            }`}
+          >
+            {/* Subtle metallic glass sheen */}
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-transparent via-white/10 to-white/30 pointer-events-none" />
 
-          <div className="relative flex items-center justify-center gap-1">
-            {/* Accessibility Icon / Color Symbol for active top layer */}
-            {showSymbol && !isComplete && (
-              <span
-                className={`font-black leading-none drop-shadow-sm select-none ${
-                  size > 44 ? 'text-xs' : 'text-[10px]'
-                }`}
-                style={{
-                  color: isRainbow ? '#FEF08A' : colorDef.highlight,
-                }}
-              >
-                {colorDef.symbol}
-              </span>
+            <div className="relative flex items-center justify-center gap-1.5">
+              {/* Accessibility Icon / Color Symbol for active top layer */}
+              {showSymbol && !isComplete && (
+                <span
+                  className={`font-black leading-none drop-shadow-sm select-none ${
+                    size > 55 ? 'text-sm' : size > 44 ? 'text-xs' : 'text-[10px]'
+                  }`}
+                  style={{
+                    color: isRainbow ? '#FEF08A' : colorDef.highlight,
+                  }}
+                >
+                  {colorDef.symbol}
+                </span>
+              )}
+
+              {/* Complete Crown */}
+              {isComplete && (
+                <Crown
+                  className={`${
+                    size > 55 ? 'w-4 h-4' : size > 44 ? 'w-3.5 h-3.5' : 'w-3 h-3'
+                  } text-amber-950 fill-amber-950 mr-0.5`}
+                />
+              )}
+
+              {/* Tile Count */}
+              {showCount && (
+                <span
+                  className={`font-display font-black leading-none tracking-tight select-none ${
+                    size > 55 ? 'text-base' : size > 44 ? 'text-sm' : 'text-xs'
+                  } ${isComplete ? 'text-amber-950' : 'text-white'}`}
+                >
+                  {count}
+                </span>
+              )}
+            </div>
+
+            {/* Multi-Colored Layer Indicator Dots (Bottom to Top) */}
+            {normalizedLayers.length > 1 && !isComplete && (
+              <div className="flex items-center justify-center gap-1 mt-0.5 pointer-events-none">
+                {normalizedLayers.map((l, i) => {
+                  const dotColorDef = HEX_COLORS[l.color] || HEX_COLORS['ruby-red'];
+                  const isCurrentTop = i === normalizedLayers.length - 1;
+                  return (
+                    <span
+                      key={`layer-dot-${i}`}
+                      className={`rounded-full transition-transform ${
+                        isCurrentTop
+                          ? size > 50
+                            ? 'w-2.5 h-2.5 ring-1.5 ring-white/90 shadow-[0_0_5px_white]'
+                            : 'w-2 h-2 ring-1 ring-white/90 shadow-[0_0_4px_white]'
+                          : size > 50
+                          ? 'w-2 h-2 opacity-85 shadow-[0_1px_2px_rgba(0,0,0,0.5)]'
+                          : 'w-1.5 h-1.5 opacity-85 shadow-[0_1px_2px_rgba(0,0,0,0.5)]'
+                      }`}
+                      style={{
+                        background: `linear-gradient(135deg, ${dotColorDef.highlight}, ${dotColorDef.primary})`,
+                      }}
+                      title={`Layer ${i + 1}: ${l.count} tiles (${dotColorDef.name})`}
+                    />
+                  );
+                })}
+              </div>
             )}
 
-            {/* Complete Crown */}
-            {isComplete && (
-              <Crown
-                className={`${size > 44 ? 'w-3.5 h-3.5' : 'w-3 h-3'} text-amber-950 fill-amber-950 mr-0.5`}
-              />
+            {/* Sparkle badge for rainbow tiles */}
+            {isRainbow && !isComplete && (
+              <div className="absolute -top-1.5 -right-1">
+                <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-spin fill-yellow-300 drop-shadow" />
+              </div>
             )}
-
-            {/* Tile Count */}
-            <span
-              className={`font-display font-black leading-none tracking-tight select-none ${
-                size > 44 ? 'text-sm' : 'text-xs'
-              } ${isComplete ? 'text-amber-950' : 'text-white'}`}
-            >
-              {count}
-            </span>
           </div>
-
-          {/* Multi-Colored Layer Indicator Dots (Bottom to Top) */}
-          {normalizedLayers.length > 1 && !isComplete && (
-            <div className="flex items-center justify-center gap-1 mt-0.5 pointer-events-none">
-              {normalizedLayers.map((l, i) => {
-                const dotColorDef = HEX_COLORS[l.color] || HEX_COLORS['ruby-red'];
-                const isCurrentTop = i === normalizedLayers.length - 1;
-                return (
-                  <span
-                    key={`layer-dot-${i}`}
-                    className={`rounded-full transition-transform ${
-                      isCurrentTop
-                        ? 'w-2 h-2 ring-1 ring-white/90 shadow-[0_0_4px_white]'
-                        : 'w-1.5 h-1.5 opacity-85 shadow-[0_1px_2px_rgba(0,0,0,0.5)]'
-                    }`}
-                    style={{
-                      background: `linear-gradient(135deg, ${dotColorDef.highlight}, ${dotColorDef.primary})`,
-                    }}
-                    title={`Layer ${i + 1}: ${l.count} tiles (${dotColorDef.name})`}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          {/* Sparkle badge for rainbow tiles */}
-          {isRainbow && !isComplete && (
-            <div className="absolute -top-1.5 -right-1">
-              <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-spin fill-yellow-300 drop-shadow" />
-            </div>
-          )}
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
     </motion.div>
   );
 };

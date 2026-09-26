@@ -176,6 +176,7 @@ export interface GameSettings {
   darkMode: boolean;
   highContrast: boolean;
   showAccessibilitySymbols: boolean;
+  showTileCount: boolean;
   reducedMotion: boolean;
   confirmRestart: boolean;
   animationSpeed: 'normal' | 'fast';

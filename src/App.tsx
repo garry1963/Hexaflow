@@ -964,7 +964,7 @@ export default function App() {
           )}
 
           {/* Main 3D Hexagonal Honeycomb Board */}
-          <main className="flex-1 flex items-center justify-center my-auto py-2">
+          <main className="flex-1 flex items-center justify-center my-auto py-2 w-full">
             <HexBoard
               cells={boardCells}
               boardState={boardState}
@@ -972,6 +972,7 @@ export default function App() {
               onCellClick={handleCellClick}
               validTargetIds={validTargetIds}
               showSymbols={settings.showAccessibilitySymbols}
+              showCount={settings.showTileCount}
               maxCapacity={levelData.stackCapacity}
               activeTransfers={activeTransfers}
               onTransfersCompleted={() => setActiveTransfers([])}
@@ -1000,6 +1001,7 @@ export default function App() {
                     handleDragStart(e, slotIdx, slotStack)
                   }
                   showSymbols={settings.showAccessibilitySymbols}
+                  showCount={settings.showTileCount}
                   maxCapacity={levelData.stackCapacity}
                 />
               ))}
@@ -1025,9 +1027,10 @@ export default function App() {
           <div className="filter drop-shadow-[0_20px_35px_rgba(0,0,0,0.7)]">
             <HexTileStack
               stack={dragState.stack}
-              size={42}
+              size={46}
               isSelected={true}
               showSymbol={settings.showAccessibilitySymbols}
+              showCount={settings.showTileCount}
               maxCapacity={levelData.stackCapacity}
             />
           </div>

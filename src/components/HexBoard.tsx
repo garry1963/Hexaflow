@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { BoardCell, BoardState, CascadeTransfer, HexColorId, TileStack } from '../types';
 import { hexToPixel, SQRT_3, getRoundedHexPath } from '../utils/hexMath';
@@ -13,6 +13,7 @@ interface HexBoardProps {
   onCellClick: (cell: BoardCell) => void;
   validTargetIds: string[];
   showSymbols: boolean;
+  showCount?: boolean;
   maxCapacity: number;
   hoveredCellId?: string | null;
   activeTransfers?: CascadeTransfer[];
@@ -25,18 +26,106 @@ export const HexBoard: React.FC<HexBoardProps> = ({
   onCellClick,
   validTargetIds,
   showSymbols,
+  showCount = true,
   maxCapacity,
   hoveredCellId,
   activeTransfers,
   onTransfersCompleted,
 }) => {
-  // Compute board bounds to center dynamically
+  // Measure viewport to adapt board sizing for tablet portrait and responsive displays
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 800,
+    height: typeof window !== 'undefined' ? window.innerHeight : 1000,
+  }));
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Compute board bounds and optimal hex size dynamically
   const { hexSize, boardWidth, boardHeight, minX, minY } = useMemo(() => {
     const count = cells.length;
+    const isPortrait = viewport.height > viewport.width;
+    const isTabletPortrait = isPortrait && viewport.width >= 600;
+
+    // 1. Calculate normalized unit coordinates (at size = 1)
+    let minUnitX = Infinity,
+      maxUnitX = -Infinity,
+      minUnitY = Infinity,
+      maxUnitY = -Infinity;
+
+    cells.forEach((cell) => {
+      const { x, y } = hexToPixel(cell.q, cell.r, 1);
+      if (x < minUnitX) minUnitX = x;
+      if (x > maxUnitX) maxUnitX = x;
+      if (y < minUnitY) minUnitY = y;
+      if (y > maxUnitY) maxUnitY = y;
+    });
+
+    // Effective span in units of size
+    const spanUnitX = maxUnitX - minUnitX + 2.2;
+    const spanUnitY = maxUnitY - minUnitY + 2.2;
+
     let size = 44;
-    if (count <= 7) size = 56;
-    else if (count <= 19) size = 45;
-    else size = 36;
+
+    if (isTabletPortrait) {
+      // In tablet portrait mode, expand board to make prominent use of generous screen area
+      // Budget: leave room for top HUD (~160px), bottom tray (~200px), safe padding (~50px)
+      const availableWidth = Math.min(viewport.width - 48, 880);
+      const availableHeight = Math.max(420, viewport.height - 390);
+
+      const fitSizeW = availableWidth / spanUnitX;
+      const fitSizeH = availableHeight / spanUnitY;
+      const optimalFit = Math.min(fitSizeW, fitSizeH);
+
+      // Clamp according to honeycomb grid tier
+      if (count <= 7) {
+        size = Math.min(84, Math.max(68, optimalFit));
+      } else if (count <= 19) {
+        size = Math.min(74, Math.max(58, optimalFit));
+      } else {
+        size = Math.min(58, Math.max(46, optimalFit));
+      }
+    } else if (isPortrait) {
+      // Mobile portrait mode (width < 600)
+      const availableWidth = Math.min(viewport.width - 24, 460);
+      const availableHeight = Math.max(340, viewport.height - 350);
+
+      const fitSizeW = availableWidth / spanUnitX;
+      const fitSizeH = availableHeight / spanUnitY;
+      const optimalFit = Math.min(fitSizeW, fitSizeH);
+
+      if (count <= 7) {
+        size = Math.min(62, Math.max(50, optimalFit));
+      } else if (count <= 19) {
+        size = Math.min(48, Math.max(38, optimalFit));
+      } else {
+        size = Math.min(38, Math.max(30, optimalFit));
+      }
+    } else {
+      // Landscape / Desktop mode
+      const availableWidth = Math.min(viewport.width * 0.65, 780);
+      const availableHeight = Math.max(380, viewport.height - 240);
+
+      const fitSizeW = availableWidth / spanUnitX;
+      const fitSizeH = availableHeight / spanUnitY;
+      const optimalFit = Math.min(fitSizeW, fitSizeH);
+
+      if (count <= 7) {
+        size = Math.min(70, Math.max(54, optimalFit));
+      } else if (count <= 19) {
+        size = Math.min(56, Math.max(44, optimalFit));
+      } else {
+        size = Math.min(44, Math.max(34, optimalFit));
+      }
+    }
 
     let minX = Infinity,
       maxX = -Infinity,
@@ -51,24 +140,24 @@ export const HexBoard: React.FC<HexBoardProps> = ({
       if (y > maxY) maxY = y;
     });
 
-    const padding = size * 2.4;
+    const padding = size * 2.2;
     const width = maxX - minX + padding;
     const height = maxY - minY + padding;
 
     return {
-      hexSize: size,
-      boardWidth: width,
-      boardHeight: height,
+      hexSize: Math.round(size),
+      boardWidth: Math.round(width),
+      boardHeight: Math.round(height),
       minX: minX - padding / 2,
       minY: minY - padding / 2,
     };
-  }, [cells]);
+  }, [cells, viewport]);
 
   return (
-    <div className="relative flex items-center justify-center p-2 w-full max-w-2xl mx-auto touch-none select-none">
+    <div className="relative flex items-center justify-center p-2 w-full max-w-4xl mx-auto touch-none select-none">
       {/* 3D Machined Wooden / Carbon-Slate Table Tray Framing */}
       <div
-        className="relative bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 rounded-[36px] p-6 md:p-8 border-2 border-slate-700/70 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_2px_4px_rgba(255,255,255,0.12)] backdrop-blur-xl transition-all overflow-hidden"
+        className="relative bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 rounded-[36px] p-5 md:p-8 border-2 border-slate-700/70 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_2px_4px_rgba(255,255,255,0.12)] backdrop-blur-xl transition-all overflow-hidden"
         style={{
           width: `${boardWidth}px`,
           height: `${boardHeight}px`,
@@ -219,7 +308,7 @@ export const HexBoard: React.FC<HexBoardProps> = ({
 
                 {/* 2. Socket Recessed Cavity Wall (Inner depth) */}
                 <path
-                  d={getRoundedHexPath(cx, cy, hexSize * 0.93, hexSize * 0.18 * 0.93)}
+                  d={getRoundedHexPath(cx, cy, hexSize * 0.98, hexSize * 0.16 * 0.98)}
                   fill={`url(#socket-cavity-${cell.id})`}
                   stroke="rgba(0,0,0,0.6)"
                   strokeWidth="1"
@@ -227,7 +316,7 @@ export const HexBoard: React.FC<HexBoardProps> = ({
 
                 {/* 3. Socket Floor Plate */}
                 <path
-                  d={getRoundedHexPath(cx, cy, hexSize * 0.82, hexSize * 0.18 * 0.82)}
+                  d={getRoundedHexPath(cx, cy, hexSize * 0.94, hexSize * 0.16 * 0.94)}
                   fill={
                     isHoveredTarget
                       ? 'rgba(52, 211, 153, 0.28)'
@@ -357,9 +446,10 @@ export const HexBoard: React.FC<HexBoardProps> = ({
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <HexTileStack
                     stack={stack}
-                    size={hexSize}
+                    size={hexSize * 0.96}
                     isSelected={false}
                     showSymbol={showSymbols}
+                    showCount={showCount}
                     maxCapacity={maxCapacity}
                     enableWaterfall={true}
                   />
@@ -412,6 +502,7 @@ export const HexBoard: React.FC<HexBoardProps> = ({
             hexSize={hexSize}
             minX={minX}
             minY={minY}
+            showSymbols={showSymbols}
             onAllCompleted={onTransfersCompleted}
           />
         )}

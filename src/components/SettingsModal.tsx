@@ -126,17 +126,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Accessibility & Visual */}
-          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+          {/* Tile Stack Display */}
+          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 space-y-3.5">
             <span className="text-xs font-display font-bold text-slate-300 uppercase tracking-wider block">
-              Accessibility & Visuals
+              Tile Stack Display
             </span>
+
+            {/* Tile Count Numbers */}
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm text-slate-200 font-medium block">Tile Stack Count</span>
+                <span className="text-[11px] text-slate-400">Display number of tiles on each stack</span>
+              </div>
+              <button
+                onClick={() =>
+                  onUpdateSettings({ showTileCount: !settings.showTileCount })
+                }
+                className={`w-12 h-6 flex items-center rounded-full p-1 transition duration-300 ${
+                  settings.showTileCount ? 'bg-cyan-500 justify-end' : 'bg-slate-800 justify-start'
+                }`}
+                title="Toggle tile count on stacks"
+              >
+                <div className="w-4 h-4 rounded-full bg-white shadow-md" />
+              </button>
+            </div>
 
             {/* Accessibility Color Symbols */}
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-sm text-slate-200 font-medium block">Colour-Blind Symbols</span>
-                <span className="text-[11px] text-slate-400">Display distinct symbols on each tile</span>
+                <span className="text-sm text-slate-200 font-medium block">Colour & Shape Symbols</span>
+                <span className="text-[11px] text-slate-400">Display colour-blind symbols on tile stacks</span>
               </div>
               <button
                 onClick={() =>
@@ -145,10 +164,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className={`w-12 h-6 flex items-center rounded-full p-1 transition duration-300 ${
                   settings.showAccessibilitySymbols ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'
                 }`}
+                title="Toggle colour symbols on stacks"
               >
                 <div className="w-4 h-4 rounded-full bg-white shadow-md" />
               </button>
             </div>
+
+            {/* Info notice when both are hidden */}
+            {!settings.showTileCount && !settings.showAccessibilitySymbols && (
+              <div className="text-[11px] text-cyan-300/80 bg-cyan-950/40 border border-cyan-800/40 rounded-xl p-2.5 flex items-center gap-1.5">
+                <span>Minimalist Zen Mode: All overlay badges removed for pure tactile 3D tile stacks.</span>
+              </div>
+            )}
+          </div>
+
+          {/* Gameplay & Motion */}
+          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+            <span className="text-xs font-display font-bold text-slate-300 uppercase tracking-wider block">
+              Gameplay & Motion
+            </span>
 
             {/* Animation Speed */}
             <div className="flex items-center justify-between">

@@ -11,6 +11,7 @@ interface TraySlotProps {
   onSelect: () => void;
   onDragStart?: (e: React.PointerEvent, index: number, stack: TileStack) => void;
   showSymbols: boolean;
+  showCount?: boolean;
   maxCapacity: number;
 }
 
@@ -22,6 +23,7 @@ export const TraySlot: React.FC<TraySlotProps> = ({
   onSelect,
   onDragStart,
   showSymbols,
+  showCount = true,
   maxCapacity,
 }) => {
   return (
@@ -32,7 +34,7 @@ export const TraySlot: React.FC<TraySlotProps> = ({
           onDragStart(e, index, stack);
         }
       }}
-      className={`relative flex items-center justify-center rounded-2xl p-3 transition-all duration-200 cursor-grab active:cursor-grabbing min-w-[88px] min-h-[96px] md:min-w-[104px] md:min-h-[112px] select-none touch-none ${
+      className={`relative flex items-center justify-center rounded-2xl p-3 transition-all duration-200 cursor-grab active:cursor-grabbing min-w-[92px] min-h-[100px] md:min-w-[114px] md:min-h-[122px] select-none touch-none ${
         isDragging
           ? 'opacity-35 scale-95 border-2 border-dashed border-cyan-400 bg-slate-900/60 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
           : isSelected
@@ -60,9 +62,10 @@ export const TraySlot: React.FC<TraySlotProps> = ({
         >
           <HexTileStack
             stack={stack}
-            size={36}
+            size={38}
             isSelected={isSelected && !isDragging}
             showSymbol={showSymbols}
+            showCount={showCount}
             maxCapacity={maxCapacity}
           />
         </motion.div>

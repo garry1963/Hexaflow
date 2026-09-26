@@ -10,6 +10,7 @@ interface CascadeStreamOverlayProps {
   hexSize: number;
   minX: number;
   minY: number;
+  showSymbols?: boolean;
   onAllCompleted?: () => void;
 }
 
@@ -18,6 +19,7 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
   hexSize,
   minX,
   minY,
+  showSymbols = true,
   onAllCompleted,
 }) => {
   // Notify when all flight trajectories finish cleanly
@@ -123,9 +125,11 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
                     }}
                   >
                     <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-transparent via-white/20 to-white/40 pointer-events-none" />
-                    <span className="text-[11px] font-black text-white drop-shadow select-none">
-                      {colorDef.symbol}
-                    </span>
+                    {showSymbols && (
+                      <span className="text-[11px] font-black text-white drop-shadow select-none">
+                        {colorDef.symbol}
+                      </span>
+                    )}
                   </div>
 
                   {/* Trailing Particle Sparkles */}

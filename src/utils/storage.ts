@@ -59,6 +59,7 @@ export const INITIAL_SETTINGS: GameSettings = {
   darkMode: true,
   highContrast: false,
   showAccessibilitySymbols: true,
+  showTileCount: true,
   reducedMotion: false,
   confirmRestart: true,
   animationSpeed: 'normal',
