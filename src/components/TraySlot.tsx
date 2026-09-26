@@ -15,7 +15,7 @@ interface TraySlotProps {
   maxCapacity: number;
 }
 
-export const TraySlot: React.FC<TraySlotProps> = ({
+export const TraySlot: React.FC<TraySlotProps> = React.memo(({
   index,
   stack,
   isSelected,
@@ -76,4 +76,4 @@ export const TraySlot: React.FC<TraySlotProps> = ({
       )}
     </div>
   );
-};
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ActiveGameState,
   BoardCell,
@@ -130,11 +130,12 @@ export default function App() {
     sourceType: 'tray';
     sourceIndex: number;
     stack: TileStack;
-    currentX: number;
-    currentY: number;
     isDragging: boolean;
   } | null>(null);
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
+  const hoveredCellIdRef = useRef<string | null>(null);
+  const dragOverlayRef = useRef<HTMLDivElement | null>(null);
+  const dragRafRef = useRef<number | null>(null);
   const dragRef = useRef<{
     sourceType: 'tray';
     sourceIndex: number;
@@ -170,9 +171,14 @@ export default function App() {
     return () => clearTimeout(watchdog);
   }, [isProcessingMove]);
 
-  // Clean up all pending timeouts on unmount
+  // Clean up all pending timeouts and drag animation frame on unmount
   useEffect(() => {
-    return () => clearMoveTimeouts();
+    return () => {
+      clearMoveTimeouts();
+      if (dragRafRef.current !== null) {
+        cancelAnimationFrame(dragRafRef.current);
+      }
+    };
   }, [clearMoveTimeouts]);
 
   // Scores & Objectives
@@ -635,151 +641,217 @@ export default function App() {
   };
 
   // Handle Board Cell Click
-  const handleCellClick = (cell: BoardCell) => {
-    if (isProcessingMove || isPaused || isFailed || isComplete) return;
-    // If in Hammer mode: smash the stack on this cell!
-    if (activeBoosterMode === 'hammer') {
-      const stack = boardState[cell.id];
-      if (stack) {
-        soundManager.playBooster();
-        setBoardState((prev) => ({ ...prev, [cell.id]: null }));
-        setActiveBoosterMode(null);
-        setProfile((prev) => ({
-          ...prev,
-          boosters: { ...prev.boosters, hammer: Math.max(0, prev.boosters.hammer - 1) },
-        }));
+  const handleCellClick = useCallback(
+    (cell: BoardCell) => {
+      if (isProcessingMove || isPaused || isFailed || isComplete) return;
+      // If in Hammer mode: smash the stack on this cell!
+      if (activeBoosterMode === 'hammer') {
+        const stack = boardState[cell.id];
+        if (stack) {
+          soundManager.playBooster();
+          setBoardState((prev) => ({ ...prev, [cell.id]: null }));
+          setActiveBoosterMode(null);
+          setProfile((prev) => ({
+            ...prev,
+            boosters: { ...prev.boosters, hammer: Math.max(0, prev.boosters.hammer - 1) },
+          }));
+        }
+        return;
       }
-      return;
-    }
 
-    // Normal move: Only allow placing a stack selected from the tray
-    if (selectedSource && selectedSource.type === 'tray') {
-      executePlacement(cell, selectedSource);
-      return;
-    }
+      // Normal move: Only allow placing a stack selected from the tray
+      if (selectedSource && selectedSource.type === 'tray') {
+        executePlacement(cell, selectedSource);
+        return;
+      }
 
-    // Board tiles cannot be selected or moved!
-  };
+      // Board tiles cannot be selected or moved!
+    },
+    [
+      isProcessingMove,
+      isPaused,
+      isFailed,
+      isComplete,
+      activeBoosterMode,
+      boardState,
+      selectedSource,
+      executePlacement,
+    ]
+  );
 
   // Handle Drag & Drop with Pointer Events (from Tray to Board only)
-  const handleDragStart = (
-    e: React.PointerEvent,
-    slotIdx: number,
-    stack: TileStack
-  ) => {
-    if (isProcessingMove || isPaused || isFailed || isComplete) return;
-    if (activeBoosterMode === 'hammer') return;
+  // Highly optimized for tablets: uses requestAnimationFrame and direct GPU transform
+  // to achieve zero-lag, 60fps/120fps fluid movement with no React re-render overhead.
+  const handleDragStart = useCallback(
+    (e: React.PointerEvent, slotIdx: number, stack: TileStack) => {
+      if (isProcessingMove || isPaused || isFailed || isComplete) return;
+      if (activeBoosterMode === 'hammer') return;
 
-    // Immediately select source so valid targets highlight
-    setSelectedSource({
-      type: 'tray',
-      index: slotIdx,
-      stack,
-    });
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-
-    dragRef.current = {
-      sourceType: 'tray',
-      sourceIndex: slotIdx,
-      stack,
-      startX,
-      startY,
-      currentX: startX,
-      currentY: startY,
-      isDragging: false,
-    };
-
-    const onPointerMove = (ev: PointerEvent) => {
-      if (!dragRef.current) return;
-      const dx = ev.clientX - dragRef.current.startX;
-      const dy = ev.clientY - dragRef.current.startY;
-      const dist = Math.hypot(dx, dy);
-
-      const isDragging = dragRef.current.isDragging || dist > 6;
-      dragRef.current.isDragging = isDragging;
-      dragRef.current.currentX = ev.clientX;
-      dragRef.current.currentY = ev.clientY;
-
-      if (isDragging) {
-        // Find cell under pointer
-        const el = document.elementFromPoint(ev.clientX, ev.clientY);
-        const cellEl = el?.closest('[data-cell-id]');
-        const targetId = cellEl?.getAttribute('data-cell-id') || null;
-        setHoveredCellId(targetId);
-      }
-
-      setDragState({ ...dragRef.current });
-    };
-
-    const onPointerUp = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerUp);
-
-      const activeDrag = dragRef.current;
-      dragRef.current = null;
-      setHoveredCellId(null);
-      setDragState(null);
-
-      if (!activeDrag) return;
-
-      if (activeDrag.isDragging) {
-        // Find cell under pointer
-        const el = document.elementFromPoint(ev.clientX, ev.clientY);
-        const cellEl = el?.closest('[data-cell-id]');
-        const targetId = cellEl?.getAttribute('data-cell-id');
-
-        if (targetId) {
-          const targetCell = boardCells.find((c) => c.id === targetId);
-          if (targetCell) {
-            const success = executePlacement(targetCell, {
-              type: 'tray',
-              index: activeDrag.sourceIndex,
-              stack: activeDrag.stack,
-            });
-            if (success) {
-              setSelectedSource(null);
-              return;
-            }
-          }
-        }
-        // Dropped in invalid area
-        soundManager.playButton();
-        setSelectedSource(null);
-      } else {
-        // Was a simple tap/click
-        soundManager.playSelect();
-      }
-    };
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
-  };
-
-  // Handle Tray Slot Click
-  const handleTraySelect = (index: number) => {
-    if (isProcessingMove || isPaused || isFailed || isComplete) return;
-    const stack = tray[index];
-    if (!stack) return;
-
-    if (
-      selectedSource?.type === 'tray' &&
-      selectedSource.index === index
-    ) {
-      // Deselect
-      setSelectedSource(null);
-    } else {
-      soundManager.playSelect();
+      // Immediately select source so valid targets highlight
       setSelectedSource({
         type: 'tray',
-        index,
+        index: slotIdx,
         stack,
       });
-    }
-  };
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+
+      dragRef.current = {
+        sourceType: 'tray',
+        sourceIndex: slotIdx,
+        stack,
+        startX,
+        startY,
+        currentX: startX,
+        currentY: startY,
+        isDragging: false,
+      };
+
+      const updateOverlayPosition = (x: number, y: number) => {
+        if (dragOverlayRef.current) {
+          dragOverlayRef.current.style.transform = `translate3d(${x}px, ${y - 34}px, 0) translate(-50%, -50%) scale(1.15)`;
+        }
+      };
+
+      const onPointerMove = (ev: PointerEvent) => {
+        if (!dragRef.current) return;
+        ev.preventDefault();
+
+        const dx = ev.clientX - dragRef.current.startX;
+        const dy = ev.clientY - dragRef.current.startY;
+        const dist = Math.hypot(dx, dy);
+
+        dragRef.current.currentX = ev.clientX;
+        dragRef.current.currentY = ev.clientY;
+
+        if (!dragRef.current.isDragging && dist > 5) {
+          dragRef.current.isDragging = true;
+          // Mount the floating drag preview and mark tray slot as being dragged (triggered ONCE)
+          setDragState({
+            sourceType: 'tray',
+            sourceIndex: dragRef.current.sourceIndex,
+            stack: dragRef.current.stack,
+            isDragging: true,
+          });
+        }
+
+        if (dragRef.current.isDragging) {
+          if (dragRafRef.current === null) {
+            dragRafRef.current = requestAnimationFrame(() => {
+              dragRafRef.current = null;
+              if (!dragRef.current) return;
+
+              // 1. Instant GPU transform update without React re-render
+              updateOverlayPosition(dragRef.current.currentX, dragRef.current.currentY);
+
+              // 2. Perform DOM hit test inside rAF and only update React state when hover target changes
+              const el = document.elementFromPoint(
+                dragRef.current.currentX,
+                dragRef.current.currentY
+              );
+              const cellEl = el?.closest('[data-cell-id]');
+              const targetId = cellEl?.getAttribute('data-cell-id') || null;
+
+              if (hoveredCellIdRef.current !== targetId) {
+                hoveredCellIdRef.current = targetId;
+                setHoveredCellId(targetId);
+              }
+            });
+          }
+        }
+      };
+
+      const onPointerUp = (ev: PointerEvent) => {
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+
+        if (dragRafRef.current !== null) {
+          cancelAnimationFrame(dragRafRef.current);
+          dragRafRef.current = null;
+        }
+
+        const activeDrag = dragRef.current;
+        dragRef.current = null;
+        const finalHoveredId = hoveredCellIdRef.current;
+        hoveredCellIdRef.current = null;
+        setHoveredCellId(null);
+        setDragState(null);
+
+        if (!activeDrag) return;
+
+        if (activeDrag.isDragging) {
+          // Identify cell under pointer
+          let targetId = finalHoveredId;
+          if (!targetId) {
+            const el = document.elementFromPoint(ev.clientX, ev.clientY);
+            const cellEl = el?.closest('[data-cell-id]');
+            targetId = cellEl?.getAttribute('data-cell-id') || null;
+          }
+
+          if (targetId) {
+            const targetCell = boardCells.find((c) => c.id === targetId);
+            if (targetCell) {
+              const success = executePlacement(targetCell, {
+                type: 'tray',
+                index: activeDrag.sourceIndex,
+                stack: activeDrag.stack,
+              });
+              if (success) {
+                setSelectedSource(null);
+                return;
+              }
+            }
+          }
+          // Dropped in invalid area
+          soundManager.playButton();
+          setSelectedSource(null);
+        } else {
+          // Was a simple tap/click
+          soundManager.playSelect();
+        }
+      };
+
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
+    },
+    [
+      isProcessingMove,
+      isPaused,
+      isFailed,
+      isComplete,
+      activeBoosterMode,
+      boardCells,
+      executePlacement,
+    ]
+  );
+
+  // Handle Tray Slot Click
+  const handleTraySelect = useCallback(
+    (index: number) => {
+      if (isProcessingMove || isPaused || isFailed || isComplete) return;
+      const stack = tray[index];
+      if (!stack) return;
+
+      if (
+        selectedSource?.type === 'tray' &&
+        selectedSource.index === index
+      ) {
+        // Deselect
+        setSelectedSource(null);
+      } else {
+        soundManager.playSelect();
+        setSelectedSource({
+          type: 'tray',
+          index,
+          stack,
+        });
+      }
+    },
+    [isProcessingMove, isPaused, isFailed, isComplete, tray, selectedSource]
+  );
 
   // Undo Move
   const handleUndo = () => {
@@ -896,15 +968,23 @@ export default function App() {
   };
 
   // Valid Drop Target IDs for Board
-  const validTargetIds = selectedSource
-    ? getValidTargetCells(
-        selectedSource.stack,
-        boardCells,
-        boardState,
-        levelData.stackCapacity,
-        unlockedCells
-      )
-    : [];
+  const validTargetIds = useMemo(() => {
+    return selectedSource
+      ? getValidTargetCells(
+          selectedSource.stack,
+          boardCells,
+          boardState,
+          levelData.stackCapacity,
+          unlockedCells
+        )
+      : [];
+  }, [
+    selectedSource,
+    boardCells,
+    boardState,
+    levelData.stackCapacity,
+    unlockedCells,
+  ]);
 
   return (
     <div
@@ -1014,20 +1094,21 @@ export default function App() {
         </div>
       )}
 
-      {/* Floating Dragged Stack Overlay (Follows finger/pointer) */}
+      {/* Floating Dragged Stack Overlay (Follows finger/pointer with zero React latency) */}
       {dragState && dragState.isDragging && (
         <div
-          className="fixed pointer-events-none z-50 transition-none select-none"
+          ref={dragOverlayRef}
+          className="fixed pointer-events-none z-50 select-none will-change-transform"
           style={{
-            left: `${dragState.currentX}px`,
-            top: `${dragState.currentY - 32}px`,
-            transform: 'translate(-50%, -50%) scale(1.15)',
+            top: 0,
+            left: 0,
+            transform: `translate3d(${dragRef.current?.currentX ?? 0}px, ${(dragRef.current?.currentY ?? 0) - 34}px, 0) translate(-50%, -50%) scale(1.15)`,
           }}
         >
-          <div className="filter drop-shadow-[0_20px_35px_rgba(0,0,0,0.7)]">
+          <div className="filter drop-shadow-[0_12px_24px_rgba(0,0,0,0.55)]">
             <HexTileStack
               stack={dragState.stack}
-              size={46}
+              size={48}
               isSelected={true}
               showSymbol={settings.showAccessibilitySymbols}
               showCount={settings.showTileCount}

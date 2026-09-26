@@ -24,7 +24,7 @@ interface HexTileStackProps {
   enableWaterfall?: boolean;
 }
 
-export const HexTileStack: React.FC<HexTileStackProps> = ({
+export const HexTileStack: React.FC<HexTileStackProps> = React.memo(({
   stack,
   size = 38,
   isSelected = false,
@@ -467,4 +467,4 @@ export const HexTileStack: React.FC<HexTileStackProps> = ({
       )}
     </motion.div>
   );
-};
+});
