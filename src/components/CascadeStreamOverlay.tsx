@@ -14,7 +14,7 @@ interface CascadeStreamOverlayProps {
   onAllCompleted?: () => void;
 }
 
-export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
+export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = React.memo(({
   transfers,
   hexSize,
   minX,
@@ -22,11 +22,11 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
   showSymbols = true,
   onAllCompleted,
 }) => {
-  // Notify when all flight trajectories finish cleanly
+  // Fast, punchy flight duration (24ms per tile stagger + 190ms arrival flight)
   useEffect(() => {
     if (!transfers || transfers.length === 0) return;
     const maxTiles = Math.max(...transfers.map((t) => t.count), 1);
-    const durationMs = (maxTiles - 1) * 70 + 460;
+    const durationMs = (maxTiles - 1) * 24 + 190;
     const timer = setTimeout(() => {
       onAllCompleted?.();
     }, durationMs);
@@ -51,7 +51,7 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
 
         return (
           <React.Fragment key={transfer.id}>
-            {/* Energy Stream Flow Beam between the two hex cells */}
+            {/* Rapid Energy Flow Beam between hex sockets */}
             <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none">
               <defs>
                 <linearGradient
@@ -62,30 +62,29 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
                   y2={y2}
                   gradientUnits="userSpaceOnUse"
                 >
-                  <stop offset="0%" stopColor={colorDef.glow} stopOpacity="0.15" />
-                  <stop offset="50%" stopColor={colorDef.highlight} stopOpacity="0.85" />
-                  <stop offset="100%" stopColor={colorDef.primary} stopOpacity="0.9" />
+                  <stop offset="0%" stopColor={colorDef.glow} stopOpacity="0.2" />
+                  <stop offset="60%" stopColor={colorDef.highlight} stopOpacity="0.9" />
+                  <stop offset="100%" stopColor={colorDef.primary} stopOpacity="0.95" />
                 </linearGradient>
               </defs>
-              {/* Curved quadratic energy arc line */}
               <motion.path
-                d={`M ${x1} ${y1} Q ${(x1 + x2) / 2} ${Math.min(y1, y2) - 36} ${x2} ${y2}`}
+                d={`M ${x1} ${y1} Q ${(x1 + x2) / 2} ${Math.min(y1, y2) - 28} ${x2} ${y2}`}
                 fill="none"
                 stroke={`url(#beam-grad-${transfer.id})`}
-                strokeWidth="3.5"
-                strokeDasharray="6 4"
+                strokeWidth="3"
+                strokeDasharray="5 3"
                 strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: [0, 1, 1], opacity: [0, 0.9, 0] }}
-                transition={{ duration: 0.44, ease: 'easeOut' }}
+                animate={{ pathLength: [0, 1, 1], opacity: [0, 0.95, 0] }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
               />
             </svg>
 
-            {/* Individual Flying Tiles in Waterfall Stream */}
+            {/* Snappy Flying Tiles with 120fps GPU Compositing */}
             {Array.from({ length: transfer.count }).map((_, i) => {
-              const delay = i * 0.07;
+              const delay = i * 0.024;
               const midX = (x1 + x2) / 2;
-              const midY = Math.min(y1, y2) - 34 - i * 4;
+              const midY = Math.min(y1, y2) - 26 - i * 3;
 
               return (
                 <motion.div
@@ -100,24 +99,21 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
                   animate={{
                     x: [x1, midX, x2],
                     y: [y1, midY, y2],
-                    scale: [0.65, 1.15, 0.4],
+                    scale: [0.7, 1.12, 0.4],
                     opacity: [0, 1, 1, 0],
-                    rotate: [0, i % 2 === 0 ? 18 : -18, 0],
+                    rotate: [0, i % 2 === 0 ? 12 : -12, 0],
                   }}
                   transition={{
-                    duration: 0.42,
+                    duration: 0.18,
                     delay,
-                    times: [0, 0.45, 0.85, 1],
-                    ease: [0.25, 0.8, 0.25, 1],
+                    times: [0, 0.4, 0.85, 1],
+                    ease: [0.16, 1, 0.3, 1],
                   }}
-                  className="absolute top-0 left-0 -ml-[18px] -mt-[16px] flex items-center justify-center pointer-events-none"
-                  style={{
-                    filter: `drop-shadow(0 6px 12px ${colorDef.glow}) drop-shadow(0 0 6px rgba(0,0,0,0.6))`,
-                  }}
+                  className="absolute top-0 left-0 -ml-[18px] -mt-[16px] flex items-center justify-center pointer-events-none will-change-transform"
                 >
                   {/* Glowing 3D Mini Hex Chip in Flight */}
                   <div
-                    className="relative rounded-lg flex items-center justify-center border border-white/70 shadow-inner"
+                    className="relative rounded-lg flex items-center justify-center border border-white/70 shadow-md shadow-black/50"
                     style={{
                       width: `${chipRadius * 2}px`,
                       height: `${chipRadius * 1.75}px`,
@@ -131,16 +127,6 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
                       </span>
                     )}
                   </div>
-
-                  {/* Trailing Particle Sparkles */}
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.4 }}
-                    animate={{ opacity: [0, 1, 0], scale: [0.4, 1.3, 0.2] }}
-                    transition={{ delay: delay + 0.14, duration: 0.26 }}
-                    className="absolute -top-1 -right-1"
-                  >
-                    <Sparkles className="w-3 h-3 text-yellow-300 fill-yellow-200" />
-                  </motion.div>
                 </motion.div>
               );
             })}
@@ -149,4 +135,4 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = ({
       })}
     </div>
   );
-};
+});

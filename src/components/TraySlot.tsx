@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'motion/react';
 import { TileStack } from '../types';
 import { HexTileStack } from './HexTileStack';
 
@@ -34,7 +33,7 @@ export const TraySlot: React.FC<TraySlotProps> = React.memo(({
           onDragStart(e, index, stack);
         }
       }}
-      className={`relative flex items-center justify-center rounded-2xl p-3 transition-all duration-200 cursor-grab active:cursor-grabbing min-w-[92px] min-h-[100px] md:min-w-[114px] md:min-h-[122px] select-none touch-none ${
+      className={`relative flex items-center justify-center rounded-2xl p-3 transition-colors duration-100 cursor-grab active:cursor-grabbing min-w-[92px] min-h-[100px] md:min-w-[114px] md:min-h-[122px] select-none touch-none ${
         isDragging
           ? 'opacity-35 scale-95 border-2 border-dashed border-cyan-400 bg-slate-900/60 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
           : isSelected
@@ -53,12 +52,10 @@ export const TraySlot: React.FC<TraySlotProps> = React.memo(({
       </div>
 
       {stack ? (
-        <motion.div
-          key={stack.id}
-          initial={{ scale: 0.7, opacity: 0, y: 12 }}
-          animate={{ scale: 1, opacity: isDragging ? 0.3 : 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-          className="relative z-10 flex items-center justify-center w-full h-full"
+        <div
+          className={`relative z-10 flex items-center justify-center w-full h-full transition-opacity duration-100 ${
+            isDragging ? 'opacity-25' : 'opacity-100'
+          }`}
         >
           <HexTileStack
             stack={stack}
@@ -68,7 +65,7 @@ export const TraySlot: React.FC<TraySlotProps> = React.memo(({
             showCount={showCount}
             maxCapacity={maxCapacity}
           />
-        </motion.div>
+        </div>
       ) : (
         <span className="relative z-10 text-slate-500/80 font-display text-[11px] font-bold tracking-wider uppercase select-none">
           Slot {index + 1}

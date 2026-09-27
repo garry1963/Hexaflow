@@ -141,12 +141,12 @@ export const HexTileStack: React.FC<HexTileStackProps> = React.memo(({
       }
       transition={
         isClearing
-          ? { duration: 0.44, ease: [0.22, 1, 0.36, 1] }
+          ? { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
           : isComplete
-          ? { duration: 0.4, ease: 'easeOut' }
+          ? { duration: 0.18, ease: 'easeOut' }
           : stack.animating === 'bounce' || stack.animating === 'waterfall'
-          ? { duration: 0.32, ease: 'easeOut' }
-          : { type: 'spring', stiffness: 450, damping: 25 }
+          ? { duration: 0.16, ease: 'easeOut' }
+          : { duration: 0.12, ease: 'easeOut' }
       }
       style={{
         width: `${hexW}px`,

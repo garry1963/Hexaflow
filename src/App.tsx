@@ -560,10 +560,10 @@ export default function App() {
       highestScore: Math.max(prev.highestScore, nextScore),
     }));
 
-    // Calculate total duration for transfers to land and stack smoothly
+    // Fast, snappy, responsive cascade duration (24ms stagger + 190ms flight)
     const transferCount = result.transfers?.reduce((acc, t) => Math.max(acc, t.count), 0) || 0;
     const hasTransfers = transferCount > 0;
-    const transferFlightDurationMs = hasTransfers ? (transferCount - 1) * 70 + 440 : 0;
+    const transferFlightDurationMs = hasTransfers ? (transferCount - 1) * 24 + 190 : 0;
 
     if (result.isComplete) {
       setIsProcessingMove(true);
@@ -581,7 +581,7 @@ export default function App() {
         }));
         setActiveTransfers([]);
 
-        // After celebratory burst & dissolve (440ms), update to remaining stack & release lock
+        // Fast celebratory burst & dissolve (190ms), update to remaining stack & release lock
         const finishTimer = setTimeout(() => {
           const clearedBoard = {
             ...result.nextBoard,
@@ -597,7 +597,7 @@ export default function App() {
             nextCompletedColors,
             clearedBoard
           );
-        }, 440);
+        }, 190);
         moveTimeoutsRef.current.push(finishTimer);
       };
 
@@ -687,11 +687,24 @@ export default function App() {
       if (isProcessingMove || isPaused || isFailed || isComplete) return;
       if (activeBoosterMode === 'hammer') return;
 
+      const pointerTarget = e.currentTarget as HTMLElement;
+      try {
+        pointerTarget.setPointerCapture(e.pointerId);
+      } catch {}
+
       // Immediately select source so valid targets highlight
       setSelectedSource({
         type: 'tray',
         index: slotIdx,
         stack,
+      });
+
+      // Pre-warm the drag overlay element with this stack immediately!
+      setDragState({
+        sourceType: 'tray',
+        sourceIndex: slotIdx,
+        stack,
+        isDragging: false,
       });
 
       const startX = e.clientX;
@@ -714,6 +727,9 @@ export default function App() {
         }
       };
 
+      // Set initial position
+      updateOverlayPosition(startX, startY);
+
       const onPointerMove = (ev: PointerEvent) => {
         if (!dragRef.current) return;
         ev.preventDefault();
@@ -725,27 +741,24 @@ export default function App() {
         dragRef.current.currentX = ev.clientX;
         dragRef.current.currentY = ev.clientY;
 
-        if (!dragRef.current.isDragging && dist > 5) {
+        if (!dragRef.current.isDragging && dist > 3) {
           dragRef.current.isDragging = true;
-          // Mount the floating drag preview and mark tray slot as being dragged (triggered ONCE)
-          setDragState({
-            sourceType: 'tray',
-            sourceIndex: dragRef.current.sourceIndex,
-            stack: dragRef.current.stack,
-            isDragging: true,
-          });
+          if (dragOverlayRef.current) {
+            dragOverlayRef.current.style.display = 'block';
+          }
+          setDragState((prev) => (prev ? { ...prev, isDragging: true } : null));
         }
 
         if (dragRef.current.isDragging) {
+          // Direct instantaneous GPU update on pointermove (0ms instantaneous tracking!)
+          updateOverlayPosition(ev.clientX, ev.clientY);
+
+          // Batch expensive hit testing into requestAnimationFrame
           if (dragRafRef.current === null) {
             dragRafRef.current = requestAnimationFrame(() => {
               dragRafRef.current = null;
-              if (!dragRef.current) return;
+              if (!dragRef.current || !dragRef.current.isDragging) return;
 
-              // 1. Instant GPU transform update without React re-render
-              updateOverlayPosition(dragRef.current.currentX, dragRef.current.currentY);
-
-              // 2. Perform DOM hit test inside rAF and only update React state when hover target changes
               const el = document.elementFromPoint(
                 dragRef.current.currentX,
                 dragRef.current.currentY
@@ -767,9 +780,17 @@ export default function App() {
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('pointercancel', onPointerUp);
 
+        try {
+          pointerTarget.releasePointerCapture(ev.pointerId);
+        } catch {}
+
         if (dragRafRef.current !== null) {
           cancelAnimationFrame(dragRafRef.current);
           dragRafRef.current = null;
+        }
+
+        if (dragOverlayRef.current) {
+          dragOverlayRef.current.style.display = 'none';
         }
 
         const activeDrag = dragRef.current;
@@ -1095,28 +1116,29 @@ export default function App() {
       )}
 
       {/* Floating Dragged Stack Overlay (Follows finger/pointer with zero React latency) */}
-      {dragState && dragState.isDragging && (
-        <div
-          ref={dragOverlayRef}
-          className="fixed pointer-events-none z-50 select-none will-change-transform"
-          style={{
-            top: 0,
-            left: 0,
-            transform: `translate3d(${dragRef.current?.currentX ?? 0}px, ${(dragRef.current?.currentY ?? 0) - 34}px, 0) translate(-50%, -50%) scale(1.15)`,
-          }}
-        >
-          <div className="filter drop-shadow-[0_12px_24px_rgba(0,0,0,0.55)]">
+      <div
+        ref={dragOverlayRef}
+        className="fixed pointer-events-none z-50 select-none will-change-transform"
+        style={{
+          top: 0,
+          left: 0,
+          display: dragState && dragState.isDragging ? 'block' : 'none',
+          transform: `translate3d(${dragRef.current?.currentX ?? 0}px, ${(dragRef.current?.currentY ?? 0) - 34}px, 0) translate(-50%, -50%) scale(1.15)`,
+        }}
+      >
+        {dragState && (
+          <div className="filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
             <HexTileStack
               stack={dragState.stack}
               size={48}
-              isSelected={true}
+              isSelected={false}
               showSymbol={settings.showAccessibilitySymbols}
               showCount={settings.showTileCount}
               maxCapacity={levelData.stackCapacity}
             />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Modals */}
       {isComplete && (

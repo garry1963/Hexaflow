@@ -1,11 +1,16 @@
 @import "tailwindcss";
 
 @layer base {
+  html, body, #root {
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   body {
     font-family: 'Quicksand', sans-serif;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
   }
 
   h1, h2, h3, h4, h5, h6, .font-display {
