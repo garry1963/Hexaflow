@@ -70,3 +70,51 @@
 .animate-beacon {
   animation: beacon-ripple 2s ease-in-out infinite;
 }
+
+/* 120fps Hardware-Accelerated Merge Keyframes (Off-thread GPU Composited) */
+@keyframes hexMergeFly {
+  0% {
+    transform: translate3d(var(--fly-x1), var(--fly-y1), 0) scale(0.85);
+    opacity: 0.95;
+  }
+  45% {
+    transform: translate3d(var(--fly-midx), var(--fly-midy), 0) scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--fly-x2), var(--fly-y2), 0) scale(0.65);
+    opacity: 0;
+  }
+}
+
+@keyframes beamZip {
+  0% {
+    stroke-dashoffset: 50;
+    opacity: 0;
+  }
+  35% {
+    stroke-dashoffset: 0;
+    opacity: 0.95;
+  }
+  100% {
+    stroke-dashoffset: -50;
+    opacity: 0;
+  }
+}
+
+@keyframes mergeImpactPulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-merge-impact {
+  animation: mergeImpactPulse 90ms cubic-bezier(0.2, 0.9, 0.35, 1);
+}
+

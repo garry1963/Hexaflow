@@ -135,18 +135,18 @@ export const HexTileStack: React.FC<HexTileStackProps> = React.memo(({
               y: [0, -6, -4],
               opacity: 1,
             }
-          : stack.animating === 'bounce' || stack.animating === 'waterfall'
-          ? { scale: [1, 1.12, 0.96, 1], y: [0, -8, 2, 0], opacity: 1 }
+          : stack.animating === 'bounce' || stack.animating === 'waterfall' || stack.animating === 'merging'
+          ? { scale: [1, 1.10, 0.98, 1], y: [0, -5, 1, 0], opacity: 1 }
           : { y: 0, scale: 1, opacity: 1 }
       }
       transition={
         isClearing
-          ? { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+          ? { duration: 0.12, ease: [0.22, 1, 0.36, 1] }
           : isComplete
-          ? { duration: 0.18, ease: 'easeOut' }
-          : stack.animating === 'bounce' || stack.animating === 'waterfall'
-          ? { duration: 0.16, ease: 'easeOut' }
-          : { duration: 0.12, ease: 'easeOut' }
+          ? { duration: 0.12, ease: 'easeOut' }
+          : stack.animating === 'bounce' || stack.animating === 'waterfall' || stack.animating === 'merging'
+          ? { duration: 0.09, ease: 'easeOut' }
+          : { duration: 0.09, ease: 'easeOut' }
       }
       style={{
         width: `${hexW}px`,
@@ -372,12 +372,12 @@ export const HexTileStack: React.FC<HexTileStackProps> = React.memo(({
             y: -(visibleLayers - 1) * rise - (size > 50 ? 4 : size > 40 ? 3 : 2),
           }}
           transition={{
-            y: { type: 'spring', stiffness: 340, damping: 25 },
+            y: { duration: 0.08, ease: 'easeOut' },
           }}
         >
           {/* Embossed Tactile Coin Badge */}
           <div
-            className={`relative flex flex-col items-center justify-center rounded-2xl transition-all duration-200 ${
+            className={`relative flex flex-col items-center justify-center rounded-2xl transition-colors duration-100 ${
               isComplete
                 ? 'bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 ring-2 ring-white shadow-[0_0_18px_rgba(245,158,11,0.95),inset_0_1px_2px_rgba(255,255,255,0.8)] animate-pulse'
                 : 'bg-slate-950/90 text-white backdrop-blur-[4px] ring-1.5 ring-white/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.45),0_4px_10px_rgba(0,0,0,0.75)]'

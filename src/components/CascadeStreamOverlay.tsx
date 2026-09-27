@@ -1,9 +1,7 @@
 import React, { useEffect } from 'react';
-import { motion } from 'motion/react';
 import { CascadeTransfer } from '../types';
 import { hexToPixel } from '../utils/hexMath';
 import { HEX_COLORS } from '../data/colors';
-import { Sparkles } from 'lucide-react';
 
 interface CascadeStreamOverlayProps {
   transfers: CascadeTransfer[];
@@ -22,14 +20,12 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = React.m
   showSymbols = true,
   onAllCompleted,
 }) => {
-  // Fast, punchy flight duration (24ms per tile stagger + 190ms arrival flight)
+  // Ultra-snappy 85ms GPU flight duration
   useEffect(() => {
     if (!transfers || transfers.length === 0) return;
-    const maxTiles = Math.max(...transfers.map((t) => t.count), 1);
-    const durationMs = (maxTiles - 1) * 24 + 190;
     const timer = setTimeout(() => {
       onAllCompleted?.();
-    }, durationMs);
+    }, 88);
     return () => clearTimeout(timer);
   }, [transfers, onAllCompleted]);
 
@@ -46,78 +42,59 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = React.m
         const x2 = toPixel.x - minX;
         const y2 = toPixel.y - minY;
 
+        const midX = (x1 + x2) / 2;
+        const midY = Math.min(y1, y2) - 22;
+
         const colorDef = HEX_COLORS[transfer.color] || HEX_COLORS['ruby-red'];
-        const chipRadius = hexSize * 0.42;
+        const chipRadius = hexSize * 0.44;
+
+        // Render up to 3 visual tracer chips for maximum framerate on tablets
+        const visibleChips = Math.min(Math.max(transfer.count, 1), 3);
 
         return (
           <React.Fragment key={transfer.id}>
-            {/* Rapid Energy Flow Beam between hex sockets */}
+            {/* Ultra-Fast Beam Zip SVG */}
             <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none">
-              <defs>
-                <linearGradient
-                  id={`beam-grad-${transfer.id}`}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop offset="0%" stopColor={colorDef.glow} stopOpacity="0.2" />
-                  <stop offset="60%" stopColor={colorDef.highlight} stopOpacity="0.9" />
-                  <stop offset="100%" stopColor={colorDef.primary} stopOpacity="0.95" />
-                </linearGradient>
-              </defs>
-              <motion.path
-                d={`M ${x1} ${y1} Q ${(x1 + x2) / 2} ${Math.min(y1, y2) - 28} ${x2} ${y2}`}
+              <path
+                d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`}
                 fill="none"
-                stroke={`url(#beam-grad-${transfer.id})`}
-                strokeWidth="3"
-                strokeDasharray="5 3"
+                stroke={colorDef.highlight}
+                strokeWidth="3.5"
                 strokeLinecap="round"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: [0, 1, 1], opacity: [0, 0.95, 0] }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
+                strokeDasharray="24 16"
+                style={{
+                  animation: 'beamZip 85ms cubic-bezier(0.2, 0.9, 0.35, 1) forwards',
+                  filter: `drop-shadow(0 0 6px ${colorDef.glow})`,
+                }}
               />
             </svg>
 
-            {/* Snappy Flying Tiles with 120fps GPU Compositing */}
-            {Array.from({ length: transfer.count }).map((_, i) => {
-              const delay = i * 0.024;
-              const midX = (x1 + x2) / 2;
-              const midY = Math.min(y1, y2) - 26 - i * 3;
+            {/* Hardware-Accelerated 120fps CSS GPU Flying Chips */}
+            {Array.from({ length: visibleChips }).map((_, i) => {
+              const delayMs = i * 10;
+              const offsetY = midY - i * 3;
 
               return (
-                <motion.div
+                <div
                   key={`${transfer.id}-chip-${i}`}
-                  initial={{
-                    x: x1,
-                    y: y1,
-                    scale: 0.5,
-                    opacity: 0,
-                    rotate: 0,
-                  }}
-                  animate={{
-                    x: [x1, midX, x2],
-                    y: [y1, midY, y2],
-                    scale: [0.7, 1.12, 0.4],
-                    opacity: [0, 1, 1, 0],
-                    rotate: [0, i % 2 === 0 ? 12 : -12, 0],
-                  }}
-                  transition={{
-                    duration: 0.18,
-                    delay,
-                    times: [0, 0.4, 0.85, 1],
-                    ease: [0.16, 1, 0.3, 1],
-                  }}
-                  className="absolute top-0 left-0 -ml-[18px] -mt-[16px] flex items-center justify-center pointer-events-none will-change-transform"
+                  className="absolute top-0 left-0 flex items-center justify-center pointer-events-none will-change-transform"
+                  style={{
+                    '--fly-x1': `${x1}px`,
+                    '--fly-y1': `${y1}px`,
+                    '--fly-midx': `${midX}px`,
+                    '--fly-midy': `${offsetY}px`,
+                    '--fly-x2': `${x2}px`,
+                    '--fly-y2': `${y2}px`,
+                    animation: `hexMergeFly 85ms cubic-bezier(0.2, 0.9, 0.35, 1) ${delayMs}ms forwards`,
+                    transform: `translate3d(${x1}px, ${y1}px, 0)`,
+                  } as React.CSSProperties}
                 >
-                  {/* Glowing 3D Mini Hex Chip in Flight */}
                   <div
-                    className="relative rounded-lg flex items-center justify-center border border-white/70 shadow-md shadow-black/50"
+                    className="relative rounded-lg flex items-center justify-center border border-white/80 shadow-md shadow-black/60 -ml-[18px] -mt-[16px]"
                     style={{
                       width: `${chipRadius * 2}px`,
-                      height: `${chipRadius * 1.75}px`,
-                      background: `linear-gradient(135deg, ${colorDef.highlight} 0%, ${colorDef.primary} 70%, ${colorDef.shadow} 100%)`,
+                      height: `${chipRadius * 1.8}px`,
+                      background: `linear-gradient(135deg, ${colorDef.highlight} 0%, ${colorDef.primary} 65%, ${colorDef.shadow} 100%)`,
                     }}
                   >
                     <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-transparent via-white/20 to-white/40 pointer-events-none" />
@@ -126,8 +103,13 @@ export const CascadeStreamOverlay: React.FC<CascadeStreamOverlayProps> = React.m
                         {colorDef.symbol}
                       </span>
                     )}
+                    {i === 0 && transfer.count > 1 && (
+                      <span className="absolute -top-2 -right-2 bg-amber-400 text-slate-950 font-display font-black text-[9px] px-1 rounded-full shadow border border-white">
+                        +{transfer.count}
+                      </span>
+                    )}
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </React.Fragment>

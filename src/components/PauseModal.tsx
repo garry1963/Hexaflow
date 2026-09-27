@@ -9,6 +9,7 @@ interface PauseModalProps {
   onQuitToMenu: () => void;
   onOpenTutorial?: () => void;
   confirmRestart: boolean;
+  isDaily?: boolean;
 }
 
 export const PauseModal: React.FC<PauseModalProps> = ({
@@ -18,14 +19,24 @@ export const PauseModal: React.FC<PauseModalProps> = ({
   onQuitToMenu,
   onOpenTutorial,
   confirmRestart,
+  isDaily = false,
 }) => {
   const [isConfirmingRestart, setIsConfirmingRestart] = useState(false);
+  const [isConfirmingQuitDaily, setIsConfirmingQuitDaily] = useState(false);
 
   const handleRestartClick = () => {
     if (confirmRestart && !isConfirmingRestart) {
       setIsConfirmingRestart(true);
     } else {
       onRestart();
+    }
+  };
+
+  const handleQuitClick = () => {
+    if (isDaily && !isConfirmingQuitDaily) {
+      setIsConfirmingQuitDaily(true);
+    } else {
+      onQuitToMenu();
     }
   };
 
@@ -37,9 +48,14 @@ export const PauseModal: React.FC<PauseModalProps> = ({
         exit={{ scale: 0.9, opacity: 0 }}
         className="w-full max-w-sm bg-slate-900 border-2 border-slate-700/80 rounded-3xl p-6 shadow-2xl text-center"
       >
-        <h2 className="text-xl md:text-2xl font-display font-black text-white mb-6">
+        <h2 className="text-xl md:text-2xl font-display font-black text-white mb-2">
           GAME PAUSED
         </h2>
+        {isDaily && (
+          <p className="text-xs text-amber-400 font-bold mb-4">
+            Daily Challenge (1 Attempt Only)
+          </p>
+        )}
 
         <div className="flex flex-col gap-3">
           <button
@@ -50,35 +66,37 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             <span>RESUME</span>
           </button>
 
-          {isConfirmingRestart ? (
-            <div className="p-3 bg-rose-950/40 border border-rose-600/60 rounded-2xl flex flex-col gap-2">
-              <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-rose-300">
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
-                <span>Restart this level?</span>
+          {!isDaily && (
+            isConfirmingRestart ? (
+              <div className="p-3 bg-rose-950/40 border border-rose-600/60 rounded-2xl flex flex-col gap-2">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-rose-300">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  <span>Restart this level?</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={onRestart}
+                    className="py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-display font-bold text-xs"
+                  >
+                    Yes, Restart
+                  </button>
+                  <button
+                    onClick={() => setIsConfirmingRestart(false)}
+                    className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-display font-bold text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={onRestart}
-                  className="py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-display font-bold text-xs"
-                >
-                  Yes, Restart
-                </button>
-                <button
-                  onClick={() => setIsConfirmingRestart(false)}
-                  className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-display font-bold text-xs"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={handleRestartClick}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-98 text-slate-200 border border-slate-700 font-display font-bold text-sm flex items-center justify-center gap-2 transition"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>RESTART LEVEL</span>
-            </button>
+            ) : (
+              <button
+                onClick={handleRestartClick}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-98 text-slate-200 border border-slate-700 font-display font-bold text-sm flex items-center justify-center gap-2 transition"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>RESTART LEVEL</span>
+              </button>
+            )
           )}
 
           {onOpenTutorial && (
@@ -99,13 +117,39 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             <span>SETTINGS</span>
           </button>
 
-          <button
-            onClick={onQuitToMenu}
-            className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-rose-400 border border-slate-800 font-display font-bold text-sm flex items-center justify-center gap-2 transition"
-          >
-            <Home className="w-4 h-4" />
-            <span>QUIT TO MENU</span>
-          </button>
+          {isConfirmingQuitDaily ? (
+            <div className="p-3 bg-rose-950/50 border border-rose-600 rounded-2xl flex flex-col gap-2">
+              <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-rose-300">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>Forfeit daily puzzle?</span>
+              </div>
+              <p className="text-[11px] text-rose-200/90 leading-tight">
+                Quitting will count as a FAILED attempt and reset your win streak to 0!
+              </p>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button
+                  onClick={onQuitToMenu}
+                  className="py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-display font-bold text-xs"
+                >
+                  Forfeit & Quit
+                </button>
+                <button
+                  onClick={() => setIsConfirmingQuitDaily(false)}
+                  className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-display font-bold text-xs"
+                >
+                  Stay
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={handleQuitClick}
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-rose-400 border border-slate-800 font-display font-bold text-sm flex items-center justify-center gap-2 transition"
+            >
+              <Home className="w-4 h-4" />
+              <span>QUIT TO MENU</span>
+            </button>
+          )}
         </div>
       </motion.div>
     </div>

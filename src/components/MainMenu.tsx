@@ -14,8 +14,11 @@ import {
   Flame,
   Award,
   HelpCircle,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { GameMode, PlayerProfile } from '../types';
+import { getTodayDailyStatus } from '../utils/dailyPuzzle';
 
 interface MainMenuProps {
   profile: PlayerProfile;
@@ -41,6 +44,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   onOpenTutorial,
 }) => {
   const completedCount = Object.keys(profile.completedLevels).length;
+  const dailyStatus = getTodayDailyStatus(profile);
 
   return (
     <div className="relative w-full h-full min-h-screen flex flex-col items-center justify-between p-4 md:p-8 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 overflow-y-auto select-none touch-manipulation">
@@ -189,13 +193,51 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           {/* Daily Challenge */}
           <button
             onClick={onOpenDaily}
-            className="flex flex-col items-center text-center p-3.5 md:p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 hover:border-amber-500/50 shadow-md transition active:scale-95 group"
+            className={`flex flex-col items-center text-center p-3.5 md:p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border shadow-md transition active:scale-95 group relative ${
+              dailyStatus === 'completed'
+                ? 'border-emerald-500/50 hover:border-emerald-400'
+                : dailyStatus === 'failed'
+                ? 'border-rose-500/50 hover:border-rose-400'
+                : 'border-slate-700 hover:border-amber-500/50'
+            }`}
           >
-            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 mb-2 group-hover:scale-110 transition">
+            <div
+              className={`w-11 h-11 rounded-2xl border flex items-center justify-center mb-2 group-hover:scale-110 transition relative ${
+                dailyStatus === 'completed'
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                  : dailyStatus === 'failed'
+                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                  : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+              }`}
+            >
               <Calendar className="w-5 h-5" />
+              {dailyStatus === 'completed' && (
+                <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-slate-950 rounded-full p-0.5 shadow">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+              )}
+              {dailyStatus === 'failed' && (
+                <div className="absolute -bottom-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 shadow">
+                  <XCircle className="w-3.5 h-3.5" />
+                </div>
+              )}
             </div>
             <span className="font-display font-bold text-sm text-white">Daily</span>
-            <span className="text-[11px] text-slate-400 mt-0.5">Special Seed</span>
+            <span
+              className={`text-[11px] font-semibold mt-0.5 ${
+                dailyStatus === 'completed'
+                  ? 'text-emerald-400'
+                  : dailyStatus === 'failed'
+                  ? 'text-rose-400'
+                  : 'text-amber-400'
+              }`}
+            >
+              {dailyStatus === 'completed'
+                ? 'Solved ✓'
+                : dailyStatus === 'failed'
+                ? 'Attempt Used'
+                : '1 Attempt'}
+            </span>
           </button>
 
           {/* Weekly Challenge */}

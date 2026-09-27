@@ -25,6 +25,11 @@ import {
   generateProceduralLevel,
 } from './utils/levelGenerator';
 import {
+  getLocalDateString,
+  canAttemptDaily,
+  calculateNextWinStreak,
+} from './utils/dailyPuzzle';
+import {
   clearAllGameData,
   loadActiveGame,
   loadProfile,
@@ -374,6 +379,9 @@ export default function App() {
 
         const coinsAwarded = 100 + stars * 25;
         const xpAwarded = 25 + stars * 15;
+        const isDailyMode = gameMode === 'daily';
+        const todayStr = getLocalDateString();
+        const nextStreak = isDailyMode ? calculateNextWinStreak(profile, todayStr) : profile.dailyStreak;
 
         // Update profile
         setProfile((prev) => {
@@ -394,6 +402,11 @@ export default function App() {
               gameMode === 'campaign' && levelData.id === prev.currentLevel
                 ? Math.min(prev.currentLevel + 1, 20)
                 : prev.currentLevel,
+            dailyStreak: isDailyMode ? nextStreak : prev.dailyStreak,
+            lastDailyDate: isDailyMode ? todayStr : prev.lastDailyDate,
+            dailyHistory: isDailyMode
+              ? { ...prev.dailyHistory, [todayStr]: 'completed' }
+              : prev.dailyHistory,
             completedLevels: {
               ...prev.completedLevels,
               [levelData.id]: {
@@ -413,10 +426,13 @@ export default function App() {
           ...prev,
           totalGamesPlayed: prev.totalGamesPlayed + 1,
           highestScore: Math.max(prev.highestScore, currentScore),
-          dailyChallengesCompleted:
-            gameMode === 'daily'
-              ? prev.dailyChallengesCompleted + 1
-              : prev.dailyChallengesCompleted,
+          dailyChallengesCompleted: isDailyMode
+            ? prev.dailyChallengesCompleted + 1
+            : prev.dailyChallengesCompleted,
+          currentStreak: isDailyMode ? nextStreak : prev.currentStreak,
+          longestStreak: isDailyMode
+            ? Math.max(prev.longestStreak, nextStreak)
+            : prev.longestStreak,
         }));
 
         saveActiveGame(null);
@@ -428,9 +444,26 @@ export default function App() {
         soundManager.playInvalid();
         setIsFailed(true);
         saveActiveGame(null);
+
+        if (gameMode === 'daily') {
+          const todayStr = getLocalDateString();
+          setProfile((prev) => ({
+            ...prev,
+            dailyStreak: 0, // Failure breaks streak
+            lastDailyDate: todayStr,
+            dailyHistory: {
+              ...prev.dailyHistory,
+              [todayStr]: 'failed',
+            },
+          }));
+          setStats((prev) => ({
+            ...prev,
+            currentStreak: 0,
+          }));
+        }
       }
     },
-    [levelData, gameMode, movesMade]
+    [levelData, gameMode, movesMade, profile]
   );
 
   // Execute Placement Logic (Only tray stacks can be placed onto board)
@@ -560,10 +593,9 @@ export default function App() {
       highestScore: Math.max(prev.highestScore, nextScore),
     }));
 
-    // Fast, snappy, responsive cascade duration (24ms stagger + 190ms flight)
-    const transferCount = result.transfers?.reduce((acc, t) => Math.max(acc, t.count), 0) || 0;
-    const hasTransfers = transferCount > 0;
-    const transferFlightDurationMs = hasTransfers ? (transferCount - 1) * 24 + 190 : 0;
+    // Ultra-snappy GPU cascade duration (88ms flight)
+    const hasTransfers = (result.transfers && result.transfers.length > 0) || false;
+    const transferFlightDurationMs = hasTransfers ? 88 : 0;
 
     if (result.isComplete) {
       setIsProcessingMove(true);
@@ -581,7 +613,7 @@ export default function App() {
         }));
         setActiveTransfers([]);
 
-        // Fast celebratory burst & dissolve (190ms), update to remaining stack & release lock
+        // Instant celebratory burst & dissolve (75ms), update to remaining stack & release lock
         const finishTimer = setTimeout(() => {
           const clearedBoard = {
             ...result.nextBoard,
@@ -597,7 +629,7 @@ export default function App() {
             nextCompletedColors,
             clearedBoard
           );
-        }, 190);
+        }, 75);
         moveTimeoutsRef.current.push(finishTimer);
       };
 
@@ -971,7 +1003,12 @@ export default function App() {
       const lvl = CAMPAIGN_LEVELS[levelId - 1] || CAMPAIGN_LEVELS[0];
       startLevel(lvl, 'campaign');
     } else if (mode === 'daily') {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getLocalDateString();
+      if (!canAttemptDaily(profile, todayStr)) {
+        soundManager.playInvalid();
+        setShowDailyModal(true);
+        return;
+      }
       const seed = dateToSeed(todayStr);
       const lvl = generateProceduralLevel(900, "Today's Daily", 3, seed, 'daily');
       startLevel(lvl, 'daily');
@@ -1150,6 +1187,8 @@ export default function App() {
           stars={earnedStars}
           coinsAwarded={100 + earnedStars * 25}
           xpAwarded={25 + earnedStars * 15}
+          isDaily={gameMode === 'daily'}
+          dailyStreak={profile.dailyStreak}
           onNextLevel={() => {
             const nextLvl = CAMPAIGN_LEVELS[levelData.id] || CAMPAIGN_LEVELS[0];
             startLevel(nextLvl, 'campaign');
@@ -1159,7 +1198,11 @@ export default function App() {
             setIsComplete(false);
             setShowLevelSelect(true);
           }}
-          hasNextLevel={levelData.id < 20}
+          onQuitToMenu={() => {
+            setIsComplete(false);
+            setActiveView('menu');
+          }}
+          hasNextLevel={gameMode === 'campaign' && levelData.id < 20}
         />
       )}
 
@@ -1169,6 +1212,7 @@ export default function App() {
           score={score}
           boosters={profile.boosters}
           canUndo={undoHistory.length > 0}
+          isDaily={gameMode === 'daily'}
           onUndo={handleUndo}
           onUseExtraMoves={() => handleUseBooster('extra_moves')}
           onUseShuffle={() => handleUseBooster('shuffle')}
@@ -1176,6 +1220,10 @@ export default function App() {
           onLevelSelect={() => {
             setIsFailed(false);
             setShowLevelSelect(true);
+          }}
+          onQuitToMenu={() => {
+            setIsFailed(false);
+            setActiveView('menu');
           }}
         />
       )}
@@ -1190,10 +1238,27 @@ export default function App() {
           onOpenSettings={() => setShowSettings(true)}
           onOpenTutorial={() => setShowTutorial(true)}
           onQuitToMenu={() => {
+            if (gameMode === 'daily' && !isComplete) {
+              const todayStr = getLocalDateString();
+              setProfile((prev) => ({
+                ...prev,
+                dailyStreak: 0,
+                lastDailyDate: todayStr,
+                dailyHistory: {
+                  ...prev.dailyHistory,
+                  [todayStr]: 'failed',
+                },
+              }));
+              setStats((prev) => ({
+                ...prev,
+                currentStreak: 0,
+              }));
+            }
             setIsPaused(false);
             setActiveView('menu');
           }}
           confirmRestart={settings.confirmRestart}
+          isDaily={gameMode === 'daily'}
         />
       )}
 

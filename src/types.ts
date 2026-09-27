@@ -137,6 +137,7 @@ export interface PlayerProfile {
   currentLevel: number;
   dailyStreak: number;
   lastDailyDate: string | null;
+  dailyHistory?: { [date: string]: 'completed' | 'failed' };
   weeklyCompleted: boolean;
   boosters: BoosterInventory;
   createdAt: string;

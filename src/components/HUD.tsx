@@ -97,6 +97,11 @@ export const HUD: React.FC<HUDProps> = ({
                   ? 'Endless Mode'
                   : 'Relax Mode'}
               </span>
+              {mode === 'daily' && (
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.2 rounded border border-amber-500/40">
+                  1 Attempt
+                </span>
+              )}
               {/* Optional secret Dev tools access */}
               {onOpenDevTools && (
                 <button

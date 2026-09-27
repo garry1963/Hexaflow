@@ -302,14 +302,14 @@ const HexBoardCell: React.FC<HexBoardCellProps> = React.memo(({
           {/* Golden expanding shockwave ring */}
           <motion.div
             initial={{ scale: 0.4, opacity: 0.95 }}
-            animate={{ scale: 2.2, opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="absolute w-12 h-12 rounded-full border-2 border-amber-300 bg-amber-400/20 shadow-[0_0_18px_#F59E0B]"
+            animate={{ scale: 2.0, opacity: 0 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
+            className="absolute w-12 h-12 rounded-full border-2 border-amber-300 bg-amber-400/20 shadow-[0_0_14px_#F59E0B]"
           />
           {/* Radial golden sparkle particles */}
-          {Array.from({ length: 8 }).map((_, pIdx) => {
-            const angle = (pIdx / 8) * Math.PI * 2;
-            const dist = hexSize * 1.15;
+          {Array.from({ length: 6 }).map((_, pIdx) => {
+            const angle = (pIdx / 6) * Math.PI * 2;
+            const dist = hexSize * 1.1;
             const targetX = Math.cos(angle) * dist;
             const targetY = Math.sin(angle) * dist;
             return (
@@ -317,7 +317,7 @@ const HexBoardCell: React.FC<HexBoardCellProps> = React.memo(({
                 key={`burst-sparkle-${pIdx}`}
                 initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
                 animate={{ x: targetX, y: targetY, scale: 0.2, opacity: 0 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
                 className="absolute w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#F59E0B]"
               />
             );
