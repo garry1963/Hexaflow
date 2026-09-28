@@ -3,11 +3,10 @@ import {
   BoardState,
   CascadeTransfer,
   HexColorId,
-  LevelData,
   TileStack,
   TileStackLayer,
 } from '../types';
-import { getCellId, getNeighbors } from './hexMath';
+import { getNeighbors } from './hexMath';
 
 export interface MoveResult {
   nextBoard: BoardState;
@@ -22,6 +21,7 @@ export interface MoveResult {
   isComplete: boolean;
   activeColor: HexColorId;
   finalCount: number;
+  clearedCellIds: string[];
   remainingTargetStack?: TileStack | null;
 }
 
@@ -122,7 +122,7 @@ export function getValidTargetCells(
 
 /**
  * Executes a stack placement and cascading neighbor merge logic
- * Supports multi-colored / multi-layered stacks with cascading chain reactions!
+ * Supports multi-colored / multi-layered stacks with full-board cascading chain reactions!
  */
 export function executeMoveAndCascade(
   sourceStack: TileStack,
@@ -141,6 +141,8 @@ export function executeMoveAndCascade(
   let scoreGained = 10; // Base score for placement
   const completedColors: HexColorId[] = [];
   const newlyUnlocked: string[] = [...unlockedCells];
+  const transfers: CascadeTransfer[] = [];
+  const clearedCellIdsSet: Set<string> = new Set();
 
   // 1. Remove from source
   if (sourceTrayIndex !== null) {
@@ -150,7 +152,6 @@ export function executeMoveAndCascade(
     if (srcStack) {
       const srcLayers = normalizeLayers(srcStack);
       if (srcLayers.length > 1) {
-        // Multi-layer stack: top layer was moved, remaining layers stay!
         const remainingLayers = srcLayers.slice(0, -1);
         const newTop = remainingLayers[remainingLayers.length - 1];
         nextBoard[sourceCellId] = {
@@ -165,7 +166,7 @@ export function executeMoveAndCascade(
     }
   }
 
-  // 2. Combine layers on target cell
+  // 2. Place/Combine layers on target cell
   const existing = nextBoard[targetCell.id];
   const sourceLayers = normalizeLayers(sourceStack);
   let targetLayers: TileStackLayer[] = [];
@@ -175,7 +176,6 @@ export function executeMoveAndCascade(
     mergesCount++;
     scoreGained += 25;
 
-    // Merge touching layer boundary if colors match
     const existingTop = existingLayers[existingLayers.length - 1];
     const sourceBottom = sourceLayers[0];
 
@@ -196,110 +196,200 @@ export function executeMoveAndCascade(
     targetLayers = [...sourceLayers];
   }
 
-  // Consolidate any contiguous layers with identical color
+  // Consolidate target layers
   targetLayers = normalizeLayers({
     color: targetLayers[targetLayers.length - 1].color,
     count: targetLayers.reduce((s, l) => s + l.count, 0),
     layers: targetLayers,
   });
 
-  // 3. Cascading Neighbor Transfers Loop
-  // Allows chain reactions: when a matching top layer clears, revealed layers below can also cascade!
-  const transfers: CascadeTransfer[] = [];
+  const finalTopColor = targetLayers[targetLayers.length - 1].color;
+  nextBoard[targetCell.id] = {
+    id: `stack_${Date.now()}_${targetCell.id}`,
+    color: finalTopColor,
+    count: targetLayers.reduce((s, l) => s + l.count, 0),
+    layers: targetLayers,
+  };
+
+  // Map for fast cell coordinate lookup
+  const cellCoordMap = new Map<string, BoardCell>();
+  allCells.forEach((c) => cellCoordMap.set(c.id, c));
+
+  // 3. Global Multi-Cell Connected Cascade Engine
+  // Allows natural chain reactions across the entire board:
+  // - When a matching top layer clears, revealed layers below cascade and merge with adjacent stacks!
+  // - Tiles consolidate into the larger stack or target cell, clearing 10-stacks and freeing up space.
   let changed = true;
-  let cascadeRounds = 0;
+  let cascadeRound = 0;
+  const maxCascadeRounds = 36;
 
-  while (changed && cascadeRounds < 12) {
+  while (changed && cascadeRound < maxCascadeRounds) {
     changed = false;
-    cascadeRounds++;
+    cascadeRound++;
 
-    if (targetLayers.length === 0) break;
+    // --- PHASE A: Check for any stack that has hit capacity (>= maxCapacity) ---
+    const currentOccupiedIds = Object.keys(nextBoard).filter((id) => nextBoard[id] !== null);
+    for (const cellId of currentOccupiedIds) {
+      const st = nextBoard[cellId];
+      if (!st) continue;
+      const layers = normalizeLayers(st);
+      if (layers.length === 0) continue;
+      const top = layers[layers.length - 1];
 
-    // Check if the top layer has reached capacity (10 tiles)
-    const currentTop = targetLayers[targetLayers.length - 1];
-    if (currentTop.count >= maxCapacity) {
-      completedColors.push(currentTop.color);
-      scoreGained += 150;
-      targetLayers.pop(); // Remove completed 10-stack layer
-      changed = true;
+      if (top.count >= maxCapacity) {
+        completedColors.push(top.color);
+        clearedCellIdsSet.add(cellId);
+        mergesCount++;
+        scoreGained += 150;
+
+        layers.pop(); // Remove completed 10-stack layer
+        if (layers.length === 0) {
+          nextBoard[cellId] = null;
+        } else {
+          const newTop = layers[layers.length - 1];
+          nextBoard[cellId] = {
+            id: `stack_${Date.now()}_${cellId}`,
+            color: newTop.color,
+            count: layers.reduce((s, l) => s + l.count, 0),
+            layers,
+          };
+        }
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      // Re-evaluate with newly revealed layers
       continue;
     }
 
-    // Space available in top layer
-    const spaceForTop = maxCapacity - currentTop.count;
-    if (spaceForTop <= 0) break;
+    // --- PHASE B: Find adjacent matching pairs and merge tiles ---
+    // Sort so targetCell is checked first for immediate placement feedback
+    const occupiedForMerge = Object.keys(nextBoard).filter((id) => nextBoard[id] !== null);
+    occupiedForMerge.sort((a, b) => (a === targetCell.id ? -1 : b === targetCell.id ? 1 : 0));
 
-    const activeColor = currentTop.color;
-    const neighbors = getNeighbors(targetCell.q, targetCell.r);
+    let mergedInThisPass = false;
 
-    for (const nbr of neighbors) {
-      const nbrStack = nextBoard[nbr.id];
-      if (!nbrStack) continue;
+    for (const cellId of occupiedForMerge) {
+      if (mergedInThisPass) break;
 
-      const nbrLayers = normalizeLayers(nbrStack);
-      if (nbrLayers.length === 0) continue;
+      const stackA = nextBoard[cellId];
+      if (!stackA) continue;
+      const layersA = normalizeLayers(stackA);
+      if (layersA.length === 0) continue;
+      const topA = layersA[layersA.length - 1];
+      if (topA.count >= maxCapacity) continue;
 
-      const nbrTop = nbrLayers[nbrLayers.length - 1];
-      const matches =
-        nbrTop.color === activeColor ||
-        nbrTop.color === 'wild-rainbow' ||
-        activeColor === 'wild-rainbow';
+      const cellCoordA = cellCoordMap.get(cellId);
+      if (!cellCoordA) continue;
+      const neighbors = getNeighbors(cellCoordA.q, cellCoordA.r);
 
-      if (!matches) continue;
+      for (const nbr of neighbors) {
+        const stackB = nextBoard[nbr.id];
+        if (!stackB) continue;
+        const layersB = normalizeLayers(stackB);
+        if (layersB.length === 0) continue;
+        const topB = layersB[layersB.length - 1];
+        if (topB.count >= maxCapacity) continue;
 
-      const currentSpace = maxCapacity - currentTop.count;
-      if (currentSpace <= 0) break;
+        const colorsMatch =
+          topA.color === topB.color ||
+          topA.color === 'wild-rainbow' ||
+          topB.color === 'wild-rainbow';
 
-      const transferAmount = Math.min(currentSpace, nbrTop.count);
-      if (transferAmount <= 0) continue;
+        if (!colorsMatch) continue;
 
-      const targetCountBefore = currentTop.count;
-      currentTop.count += transferAmount;
-      const targetCountAfter = currentTop.count;
+        // Determine recipient and donor:
+        // Stacks consolidate into the one that has MORE tiles on top,
+        // or into the newly placed targetCell if tied.
+        let recipientId = cellId;
+        let recipientLayers = layersA;
+        let recipientTop = topA;
+        let donorId = nbr.id;
+        let donorLayers = layersB;
+        let donorTop = topB;
+        let recipientCoord = cellCoordA;
+        let donorCoord = nbr;
 
-      transfers.push({
-        id: `transfer_${nbr.id}_to_${targetCell.id}_${Date.now()}_${transfers.length}`,
-        fromCellId: nbr.id,
-        fromQ: nbr.q,
-        fromR: nbr.r,
-        toCellId: targetCell.id,
-        toQ: targetCell.q,
-        toR: targetCell.r,
-        color: nbrTop.color === 'wild-rainbow' ? activeColor : nbrTop.color,
-        count: transferAmount,
-        targetCountBefore,
-        targetCountAfter,
-      });
+        if (
+          topB.count > topA.count ||
+          (topB.count === topA.count && nbr.id === targetCell.id)
+        ) {
+          recipientId = nbr.id;
+          recipientLayers = layersB;
+          recipientTop = topB;
+          donorId = cellId;
+          donorLayers = layersA;
+          donorTop = topA;
+          recipientCoord = nbr;
+          donorCoord = cellCoordA;
+        }
 
-      mergesCount++;
-      scoreGained += 35 * transferAmount;
-      changed = true;
+        const space = maxCapacity - recipientTop.count;
+        if (space <= 0) continue;
 
-      // Deduct from neighbor
-      nbrTop.count -= transferAmount;
-      if (nbrTop.count <= 0) {
-        nbrLayers.pop(); // Top layer depleted, revealing layer below!
-      }
+        const transferCount = Math.min(space, donorTop.count);
+        if (transferCount <= 0) continue;
 
-      if (nbrLayers.length === 0) {
-        nextBoard[nbr.id] = null;
-      } else {
-        const newTop = nbrLayers[nbrLayers.length - 1];
-        nextBoard[nbr.id] = {
-          id: `stack_${Date.now()}_${nbr.id}`,
-          color: newTop.color,
-          count: nbrLayers.reduce((s, l) => s + l.count, 0),
-          layers: nbrLayers,
+        const resolvedColor =
+          recipientTop.color === 'wild-rainbow'
+            ? donorTop.color === 'wild-rainbow'
+              ? 'ruby-red'
+              : donorTop.color
+            : recipientTop.color;
+
+        recipientTop.color = resolvedColor;
+        const targetCountBefore = recipientTop.count;
+        recipientTop.count += transferCount;
+        const targetCountAfter = recipientTop.count;
+
+        donorTop.count -= transferCount;
+
+        transfers.push({
+          id: `transfer_${donorId}_to_${recipientId}_${Date.now()}_${transfers.length}`,
+          fromCellId: donorId,
+          fromQ: donorCoord.q,
+          fromR: donorCoord.r,
+          toCellId: recipientId,
+          toQ: recipientCoord.q,
+          toR: recipientCoord.r,
+          color: resolvedColor,
+          count: transferCount,
+          targetCountBefore,
+          targetCountAfter,
+        });
+
+        mergesCount++;
+        scoreGained += 35 * transferCount;
+
+        // Update donor on board
+        if (donorTop.count <= 0) {
+          donorLayers.pop();
+        }
+        if (donorLayers.length === 0) {
+          nextBoard[donorId] = null;
+        } else {
+          const newTopD = donorLayers[donorLayers.length - 1];
+          nextBoard[donorId] = {
+            id: `stack_${Date.now()}_${donorId}`,
+            color: newTopD.color,
+            count: donorLayers.reduce((s, l) => s + l.count, 0),
+            layers: donorLayers,
+          };
+        }
+
+        // Update recipient on board
+        nextBoard[recipientId] = {
+          id: `stack_${Date.now()}_${recipientId}`,
+          color: recipientTop.color,
+          count: recipientLayers.reduce((s, l) => s + l.count, 0),
+          layers: recipientLayers,
         };
-      }
-    }
 
-    // Check again if currentTop hit maxCapacity after neighbor transfers
-    if (currentTop.count >= maxCapacity) {
-      completedColors.push(currentTop.color);
-      scoreGained += 150;
-      targetLayers.pop();
-      changed = true;
+        changed = true;
+        mergedInThisPass = true;
+        break; // Break inner loop to re-evaluate connected component
+      }
     }
   }
 
@@ -308,42 +398,7 @@ export function executeMoveAndCascade(
     scoreGained *= targetCell.bonusMultiplier;
   }
 
-  // 4. Determine final target board state & completion handling
-  const isComplete = completedColors.length > 0;
-  const remainingCount = targetLayers.reduce((s, l) => s + l.count, 0);
-  let remainingTargetStack: TileStack | null = null;
-
-  if (remainingCount > 0) {
-    const top = targetLayers[targetLayers.length - 1];
-    remainingTargetStack = {
-      id: `stack_${Date.now()}_${targetCell.id}`,
-      color: top.color,
-      count: remainingCount,
-      layers: targetLayers,
-    };
-  }
-
-  if (isComplete) {
-    // Show completed 10-stack for visual fireworks/crown before dissolving
-    const completedColor = completedColors[0];
-    nextBoard[targetCell.id] = {
-      id: `stack_${Date.now()}_${targetCell.id}`,
-      color: completedColor,
-      count: maxCapacity,
-      isCompleted: true,
-      animating: 'waterfall',
-      cascadeAdded: sourceStack.count,
-      layers: [{ color: completedColor, count: maxCapacity }],
-    };
-  } else {
-    nextBoard[targetCell.id] = remainingTargetStack;
-    if (nextBoard[targetCell.id]) {
-      nextBoard[targetCell.id]!.animating = 'waterfall';
-      nextBoard[targetCell.id]!.cascadeAdded = sourceStack.count;
-    }
-  }
-
-  // 5. Update locks on cells requiring merges
+  // Update locks on cells requiring merges
   allCells.forEach((c) => {
     if (c.isLocked && c.lockRequirement?.type === 'merges') {
       const current = (c.lockRequirement.current || 0) + mergesCount;
@@ -354,10 +409,12 @@ export function executeMoveAndCascade(
     }
   });
 
-  const finalTopColor =
-    targetLayers.length > 0
-      ? targetLayers[targetLayers.length - 1].color
-      : completedColors[0] || sourceStack.color;
+  const isComplete = completedColors.length > 0;
+  const remainingTargetStack = nextBoard[targetCell.id] || null;
+  const finalCount = remainingTargetStack ? remainingTargetStack.count : 0;
+  const activeTopColor = remainingTargetStack
+    ? remainingTargetStack.color
+    : completedColors[0] || sourceStack.color;
 
   return {
     nextBoard,
@@ -370,8 +427,9 @@ export function executeMoveAndCascade(
     placedCount: sourceStack.count,
     targetCellId: targetCell.id,
     isComplete,
-    activeColor: finalTopColor,
-    finalCount: remainingCount,
+    activeColor: activeTopColor,
+    finalCount,
+    clearedCellIds: Array.from(clearedCellIdsSet),
     remainingTargetStack,
   };
 }

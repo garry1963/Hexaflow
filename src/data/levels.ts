@@ -19,7 +19,6 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     incomingPool: [
       { color: 'ruby-red', count: 3 },
       { color: 'azure-blue', count: 5 },
-      { color: 'ruby-red', count: 4 },
     ],
     objective: {
       type: 'complete_colors',
@@ -28,7 +27,7 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       moveLimit: 12,
     },
     starThresholds: [400, 800, 1200],
-    tips: 'Tap or drag a stack to an adjacent matching color to merge them!',
+    tips: 'Place matching tiles adjacent to each other to trigger automatic cascade merges!',
   },
   {
     id: 2,
@@ -47,7 +46,6 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     incomingPool: [
       { color: 'ruby-red', count: 3 },
       { color: 'sunburst-yellow', count: 6 },
-      { color: 'ruby-red', count: 2 },
     ],
     objective: {
       type: 'complete_colors',
@@ -56,7 +54,7 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       moveLimit: 14,
     },
     starThresholds: [500, 950, 1400],
-    tips: 'When a stack reaches 10 tiles, it clears the board space automatically!',
+    tips: 'When a stack reaches 10 tiles, it automatically clears and frees up the board socket!',
   },
   {
     id: 3,
@@ -76,16 +74,14 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     incomingPool: [
       { color: 'azure-blue', count: 2 },
       { color: 'emerald-green', count: 2 },
-      { color: 'azure-blue', count: 4 },
-      { color: 'emerald-green', count: 4 },
     ],
     objective: {
       type: 'clear_board',
       description: 'Clear all initial tiles from the board',
-      moveLimit: 15,
+      moveLimit: 14,
     },
     starThresholds: [600, 1100, 1600],
-    tips: 'Adjacent matching stacks cascade into the target stack!',
+    tips: 'Connecting matching stacks cascades all tiles into full 10-stacks that clear cleanly!',
   },
   {
     id: 4,
@@ -105,7 +101,6 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     incomingPool: [
       { color: 'ruby-red', count: 3 },
       { color: 'emerald-green', count: 2 },
-      { color: 'ruby-red', count: 4 },
     ],
     objective: {
       type: 'complete_colors',
@@ -162,23 +157,14 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     incomingPool: [
       {
         color: 'sunburst-yellow',
-        count: 4,
+        count: 3,
         layers: [
-          { color: 'azure-blue', count: 2 },
+          { color: 'azure-blue', count: 1 },
           { color: 'sunburst-yellow', count: 2 },
         ],
       },
-      { color: 'azure-blue', count: 3 },
-      { color: 'sunburst-yellow', count: 4 },
+      { color: 'sunburst-yellow', count: 3 },
       { color: 'ruby-red', count: 3 },
-      {
-        color: 'ruby-red',
-        count: 4,
-        layers: [
-          { color: 'sunburst-yellow', count: 2 },
-          { color: 'ruby-red', count: 2 },
-        ],
-      },
     ],
     objective: {
       type: 'target_score',
@@ -187,7 +173,7 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       moveLimit: 16,
     },
     starThresholds: [1000, 1500, 2200],
-    tips: 'Multi-layer stacks unlocked! Stacks can hold up to 3 colors. Merge the top layer to uncover what lies beneath!',
+    tips: 'Multi-layer stacks unlocked! Stacks hold multiple colors. Clear the top layer to reveal what lies beneath!',
   },
 
   // WORLD 2 — FUNDAMENTALS (Levels 6 - 10)
@@ -237,24 +223,9 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      {
-        color: 'sunburst-yellow',
-        count: 5,
-        layers: [
-          { color: 'ruby-red', count: 2 },
-          { color: 'sunburst-yellow', count: 3 },
-        ],
-      },
-      { color: 'azure-blue', count: 5 },
-      {
-        color: 'ruby-red',
-        count: 6,
-        layers: [
-          { color: 'azure-blue', count: 2 },
-          { color: 'ruby-red', count: 4 },
-        ],
-      },
-      { color: 'sunburst-yellow', count: 4 },
+      { color: 'ruby-red', count: 1 },
+      { color: 'azure-blue', count: 2 },
+      { color: 'sunburst-yellow', count: 5 },
     ],
     objective: {
       type: 'complete_colors',
@@ -263,7 +234,7 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       moveLimit: 18,
     },
     starThresholds: [800, 1600, 2400],
-    tips: 'The coin badge displays layer dots at the bottom showing each color from bottom to top!',
+    tips: 'Watch for chain reactions: when a stack clears, its revealed color can instantly merge with neighbors!',
   },
   {
     id: 7,
@@ -311,16 +282,9 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      {
-        color: 'royal-purple',
-        count: 5,
-        layers: [
-          { color: 'emerald-green', count: 2 },
-          { color: 'royal-purple', count: 3 },
-        ],
-      },
+      { color: 'royal-purple', count: 1 },
       { color: 'emerald-green', count: 5 },
-      { color: 'azure-blue', count: 6 },
+      { color: 'azure-blue', count: 2 },
     ],
     objective: {
       type: 'complete_colors',
@@ -372,9 +336,9 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      { color: 'tangerine-orange', count: 3 },
-      { color: 'cyan-breeze', count: 3 },
-      { color: 'emerald-green', count: 6 },
+      { color: 'tangerine-orange', count: 2 },
+      { color: 'cyan-breeze', count: 2 },
+      { color: 'emerald-green', count: 2 },
     ],
     objective: {
       type: 'clear_board',
@@ -416,9 +380,8 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       { cellId: '-2_1', color: 'bubblegum-pink', count: 2 },
     ],
     incomingPool: [
-      { color: 'bubblegum-pink', count: 3 },
-      { color: 'azure-blue', count: 6 },
-      { color: 'sunburst-yellow', count: 4 },
+      { color: 'bubblegum-pink', count: 5 },
+      { color: 'azure-blue', count: 5 },
     ],
     objective: {
       type: 'target_score',
@@ -462,9 +425,10 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       { cellId: '0_1', color: 'royal-purple', count: 3 },
     ],
     incomingPool: [
-      { color: 'ruby-red', count: 2 },
+      { color: 'ruby-red', count: 5 },
       { color: 'emerald-green', count: 5 },
-      { color: 'royal-purple', count: 3 },
+      { color: 'royal-purple', count: 4 },
+      { color: 'royal-purple', count: 4 },
     ],
     objective: {
       type: 'complete_colors',
@@ -525,23 +489,9 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      {
-        color: 'ruby-red',
-        count: 5,
-        layers: [
-          { color: 'sunburst-yellow', count: 2 },
-          { color: 'ruby-red', count: 3 },
-        ],
-      },
-      { color: 'azure-blue', count: 6 },
-      {
-        color: 'emerald-green',
-        count: 6,
-        layers: [
-          { color: 'azure-blue', count: 2 },
-          { color: 'emerald-green', count: 4 },
-        ],
-      },
+      { color: 'ruby-red', count: 5 },
+      { color: 'azure-blue', count: 3 },
+      { color: 'emerald-green', count: 3 },
       { color: 'sunburst-yellow', count: 5 },
     ],
     objective: {
@@ -601,16 +551,9 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      {
-        color: 'tangerine-orange',
-        count: 5,
-        layers: [
-          { color: 'royal-purple', count: 2 },
-          { color: 'tangerine-orange', count: 3 },
-        ],
-      },
-      { color: 'cyan-breeze', count: 5 },
-      { color: 'royal-purple', count: 6 },
+      { color: 'tangerine-orange', count: 5 },
+      { color: 'cyan-breeze', count: 2 },
+      { color: 'royal-purple', count: 5 },
       { color: 'lime-spring', count: 5 },
     ],
     objective: {
@@ -630,7 +573,6 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     difficulty: 3,
     boardRadius: 2,
     customCells: [
-      // Outer cell marked as locked
       { id: '0_2', q: 0, r: 2, isLocked: true, lockRequirement: { type: 'merges', target: 3, current: 0 } },
       { id: '0_-2', q: 0, r: -2, isLocked: true, lockRequirement: { type: 'merges', target: 5, current: 0 } },
     ],
@@ -669,16 +611,9 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     ],
     incomingPool: [
       { color: 'ruby-red', count: 5 },
-      {
-        color: 'bubblegum-pink',
-        count: 5,
-        layers: [
-          { color: 'azure-blue', count: 2 },
-          { color: 'bubblegum-pink', count: 3 },
-        ],
-      },
-      { color: 'orchid-magenta', count: 5 },
-      { color: 'azure-blue', count: 4 },
+      { color: 'bubblegum-pink', count: 5 },
+      { color: 'orchid-magenta', count: 4 },
+      { color: 'azure-blue', count: 2 },
     ],
     objective: {
       type: 'complete_colors',
@@ -732,10 +667,10 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       { cellId: '0_-1', color: 'tangerine-orange', count: 6 },
     ],
     incomingPool: [
-      { color: 'azure-blue', count: 6 },
-      { color: 'emerald-green', count: 6 },
-      { color: 'sunburst-yellow', count: 5 },
-      { color: 'tangerine-orange', count: 4 },
+      { color: 'azure-blue', count: 7 },
+      { color: 'emerald-green', count: 5 },
+      { color: 'sunburst-yellow', count: 4 },
+      { color: 'tangerine-orange', count: 2 },
     ],
     objective: {
       type: 'complete_colors',
@@ -787,10 +722,10 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       { cellId: '0_1', color: 'ruby-red', count: 2 },
     ],
     incomingPool: [
-      { color: 'ruby-red', count: 2 },
+      { color: 'ruby-red', count: 3 },
       { color: 'royal-purple', count: 5 },
-      { color: 'cyan-breeze', count: 6 },
-      { color: 'sunburst-yellow', count: 5 },
+      { color: 'cyan-breeze', count: 4 },
+      { color: 'sunburst-yellow', count: 3 },
     ],
     objective: {
       type: 'target_score',
@@ -853,25 +788,11 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      {
-        color: 'ruby-red',
-        count: 5,
-        layers: [
-          { color: 'sunburst-yellow', count: 2 },
-          { color: 'ruby-red', count: 3 },
-        ],
-      },
-      { color: 'azure-blue', count: 5 },
-      { color: 'emerald-green', count: 6 },
-      { color: 'sunburst-yellow', count: 6 },
-      {
-        color: 'orchid-magenta',
-        count: 5,
-        layers: [
-          { color: 'ruby-red', count: 2 },
-          { color: 'orchid-magenta', count: 3 },
-        ],
-      },
+      { color: 'ruby-red', count: 5 },
+      { color: 'azure-blue', count: 3 },
+      { color: 'emerald-green', count: 3 },
+      { color: 'sunburst-yellow', count: 4 },
+      { color: 'orchid-magenta', count: 5 },
     ],
     objective: {
       type: 'complete_colors',
@@ -923,17 +844,10 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       { cellId: '-1_1', color: 'royal-purple', count: 5 },
     ],
     incomingPool: [
-      {
-        color: 'ocean-teal',
-        count: 5,
-        layers: [
-          { color: 'royal-purple', count: 2 },
-          { color: 'ocean-teal', count: 3 },
-        ],
-      },
+      { color: 'ocean-teal', count: 4 },
       { color: 'tangerine-orange', count: 5 },
-      { color: 'lime-spring', count: 4 },
-      { color: 'royal-purple', count: 5 },
+      { color: 'lime-spring', count: 5 },
+      { color: 'royal-purple', count: 1 },
     ],
     objective: {
       type: 'limited_moves',
@@ -988,10 +902,10 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      { color: 'bubblegum-pink', count: 5 },
+      { color: 'bubblegum-pink', count: 4 },
       { color: 'cyan-breeze', count: 5 },
-      { color: 'sunburst-yellow', count: 6 },
-      { color: 'ruby-red', count: 5 },
+      { color: 'sunburst-yellow', count: 4 },
+      { color: 'ruby-red', count: 4 },
     ],
     objective: {
       type: 'target_score',
@@ -1058,10 +972,10 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      { color: 'ruby-red', count: 4 },
+      { color: 'ruby-red', count: 5 },
       { color: 'azure-blue', count: 5 },
-      { color: 'emerald-green', count: 5 },
-      { color: 'sunburst-yellow', count: 6 },
+      { color: 'emerald-green', count: 3 },
+      { color: 'sunburst-yellow', count: 2 },
       { color: 'royal-purple', count: 5 },
     ],
     objective: {
@@ -1124,18 +1038,11 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
       },
     ],
     incomingPool: [
-      {
-        color: 'ruby-red',
-        count: 5,
-        layers: [
-          { color: 'orchid-magenta', count: 2 },
-          { color: 'ruby-red', count: 3 },
-        ],
-      },
-      { color: 'azure-blue', count: 6 },
-      { color: 'emerald-green', count: 5 },
-      { color: 'sunburst-yellow', count: 6 },
-      { color: 'orchid-magenta', count: 4 },
+      { color: 'ruby-red', count: 3 },
+      { color: 'azure-blue', count: 5 },
+      { color: 'emerald-green', count: 4 },
+      { color: 'sunburst-yellow', count: 2 },
+      { color: 'orchid-magenta', count: 5 },
     ],
     objective: {
       type: 'target_score',

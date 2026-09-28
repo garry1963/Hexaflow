@@ -75,32 +75,81 @@ interface UndoSnapshot {
   unlockedCells: string[];
 }
 
-function generateRandomTrayStack(
+function generateSmartTrayStack(
+  boardState: BoardState,
   availableColors: HexColorId[],
   levelId: number,
-  slotIndex: number
+  slotIndex: number,
+  stackCapacity: number = 10
 ): TileStack {
-  const maxLayers = levelId >= 5 ? Math.min(3, availableColors.length) : 1;
-  const numLayers = maxLayers > 1 ? 1 + Math.floor(Math.random() * maxLayers) : 1;
+  // Count how many tiles of each color exist on the board
+  const boardCounts: { [c in HexColorId]?: number } = {};
+  Object.values(boardState).forEach((stack) => {
+    if (!stack) return;
+    if (stack.layers && stack.layers.length > 0) {
+      stack.layers.forEach((l) => {
+        boardCounts[l.color] = (boardCounts[l.color] || 0) + l.count;
+      });
+    } else {
+      boardCounts[stack.color] = (boardCounts[stack.color] || 0) + stack.count;
+    }
+  });
 
-  const shuffledColors = [...availableColors].sort(() => Math.random() - 0.5);
-  const pickedColors = shuffledColors.slice(0, numLayers);
+  const existingColors = (Object.keys(boardCounts) as HexColorId[]).filter(
+    (c) => (boardCounts[c] || 0) > 0
+  );
 
-  const layers = pickedColors.map((color) => ({
-    color,
-    count: 2 + Math.floor(Math.random() * 3), // 2 to 4 tiles per layer
-  }));
+  let pickedColor: HexColorId;
+  let count: number;
 
-  const totalCount = layers.reduce((s, l) => s + l.count, 0);
-  const topColor = layers[layers.length - 1].color;
+  if (existingColors.length > 0) {
+    // Check if any color has incomplete stacks needing tiles
+    const candidateColors = existingColors
+      .map((c) => {
+        const cur = boardCounts[c] || 0;
+        const remainder = cur % stackCapacity;
+        const needed = remainder === 0 ? stackCapacity : stackCapacity - remainder;
+        return { color: c, needed };
+      })
+      .filter((item) => item.needed > 0);
+
+    const chosen =
+      candidateColors.length > 0
+        ? candidateColors[Math.floor(Math.random() * candidateColors.length)]
+        : { color: existingColors[Math.floor(Math.random() * existingColors.length)], needed: 3 };
+
+    pickedColor = chosen.color;
+    count = Math.min(chosen.needed, 2 + Math.floor(Math.random() * 3));
+  } else {
+    pickedColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+    count = 2 + Math.floor(Math.random() * 3);
+  }
+
+  // Multi-layer chance for level 5+
+  if (levelId >= 5 && existingColors.length >= 2 && Math.random() < 0.35) {
+    const secondColor = existingColors.find((c) => c !== pickedColor) || availableColors[0];
+    const layer1Count = Math.max(1, Math.floor(count / 2));
+    const layer2Count = Math.max(1, count - layer1Count);
+    const layers = [
+      { color: secondColor, count: layer1Count },
+      { color: pickedColor, count: layer2Count },
+    ];
+    return {
+      id: `tray_gen_${Date.now()}_${slotIndex}`,
+      color: pickedColor,
+      count: layer1Count + layer2Count,
+      layers,
+    };
+  }
 
   return {
     id: `tray_gen_${Date.now()}_${slotIndex}`,
-    color: topColor,
-    count: totalCount,
-    layers,
+    color: pickedColor,
+    count,
+    layers: [{ color: pickedColor, count }],
   };
 }
+
 
 export default function App() {
   // Navigation & View States
@@ -315,7 +364,7 @@ export default function App() {
           });
         } else {
           initialTray.push(
-            generateRandomTrayStack(lvl.availableColors, lvl.id, i)
+            generateSmartTrayStack(initialBoard, lvl.availableColors, lvl.id, i, lvl.stackCapacity)
           );
         }
       }
@@ -553,10 +602,12 @@ export default function App() {
           layers: pieceLayers,
         };
       } else {
-        nextTray[source.index] = generateRandomTrayStack(
+        nextTray[source.index] = generateSmartTrayStack(
+          result.nextBoard,
           levelData.availableColors,
           levelData.id,
-          source.index
+          source.index,
+          levelData.stackCapacity
         );
       }
     }
@@ -601,25 +652,28 @@ export default function App() {
       setIsProcessingMove(true);
 
       const triggerCompletionDissolve = () => {
-        // Play celebratory chime and mark target stack as clearing with crown & burst
+        // Play celebratory chime and mark all completed stacks as clearing with crown & burst
         soundManager.playCompleteStack();
-        setBoardState((prev) => ({
-          ...prev,
-          [targetCell.id]: {
-            ...(prev[targetCell.id] || result.nextBoard[targetCell.id]!),
-            isCompleted: true,
-            animating: 'clearing',
-          },
-        }));
+        const clearedIds =
+          result.clearedCellIds.length > 0 ? result.clearedCellIds : [targetCell.id];
+        setBoardState((prev) => {
+          const next = { ...prev };
+          clearedIds.forEach((cId) => {
+            if (next[cId] || result.nextBoard[cId]) {
+              next[cId] = {
+                ...(next[cId] || result.nextBoard[cId]!),
+                isCompleted: true,
+                animating: 'clearing',
+              };
+            }
+          });
+          return next;
+        });
         setActiveTransfers([]);
 
-        // Instant celebratory burst & dissolve (75ms), update to remaining stack & release lock
+        // Instant celebratory burst & dissolve (75ms), update to settled board & release lock
         const finishTimer = setTimeout(() => {
-          const clearedBoard = {
-            ...result.nextBoard,
-            [targetCell.id]: result.remainingTargetStack ?? null,
-          };
-          setBoardState(clearedBoard);
+          setBoardState(result.nextBoard);
           setIsProcessingMove(false);
 
           // Check objectives after clearing
@@ -627,7 +681,7 @@ export default function App() {
             nextScore,
             nextMovesRemaining,
             nextCompletedColors,
-            clearedBoard
+            result.nextBoard
           );
         }, 75);
         moveTimeoutsRef.current.push(finishTimer);

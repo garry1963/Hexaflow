@@ -24,8 +24,8 @@ export function dateToSeed(dateStr: string): number {
 }
 
 /**
- * Generates a validated procedural Hexaflow puzzle
- * From Level 5 onwards, supports multi-colored / multi-layered stacks (up to 3 colors per stack)
+ * Generates a mathematically validated procedural Hexaflow puzzle
+ * Every color present on the board is guaranteed to sum to an exact multiple of 10.
  */
 export function generateProceduralLevel(
   id: number,
@@ -37,19 +37,24 @@ export function generateProceduralLevel(
   const rng = seededRandom(seed);
 
   // Number of colors based on difficulty
-  const numColors = Math.min(difficulty + 1, 6);
-  const shuffledColors = [...COLOR_KEYS.filter((c) => c !== 'wild-rainbow')].sort(() => rng() - 0.5);
+  const numColors = Math.min(difficulty + 1, 5);
+  const shuffledColors = [...COLOR_KEYS.filter((c) => c !== 'wild-rainbow')].sort(
+    () => rng() - 0.5
+  );
   const selectedColors = shuffledColors.slice(0, numColors);
 
   const radius = mode === 'weekly' ? 2 : difficulty >= 3 ? 2 : 1;
   const allCells = generateHexHoneycomb(radius);
 
   // Pick starting stack locations
-  const numStarting = Math.min(3 + difficulty, Math.floor(allCells.length * 0.6));
-  const startingIndices = allCells.map((_, i) => i).sort(() => rng() - 0.5).slice(0, numStarting);
+  const numStarting = Math.min(3 + difficulty, Math.floor(allCells.length * 0.55));
+  const startingIndices = allCells
+    .map((_, i) => i)
+    .sort(() => rng() - 0.5)
+    .slice(0, numStarting);
 
-  // Level 5 onwards allows multi-colored stacks with up to 3 distinct colors!
-  const allowMultiLayer = id >= 5 || mode === 'weekly' || difficulty >= 3;
+  // Allow multi-layer stacks for difficulty >= 2 or weekly mode
+  const allowMultiLayer = difficulty >= 2 || mode === 'weekly';
 
   const startingBoard = startingIndices.map((cellIdx) => {
     const cell = allCells[cellIdx];
@@ -64,8 +69,7 @@ export function generateProceduralLevel(
       };
     }
 
-    // Up to 3 distinct colors per stack for level 5 onwards
-    const numLayers = Math.min(3, Math.min(selectedColors.length, 1 + Math.floor(rng() * 3)));
+    const numLayers = Math.min(2 + Math.floor(rng() * 2), selectedColors.length);
     const stackColors = [...selectedColors].sort(() => rng() - 0.5).slice(0, numLayers);
     const layers: TileStackLayer[] = stackColors.map((col) => ({
       color: col,
@@ -82,8 +86,7 @@ export function generateProceduralLevel(
     };
   });
 
-  // Calculate required target stacks so puzzle is guaranteed solvable
-  // Count starting totals per color
+  // Calculate starting totals per color
   const colorCounts: { [color in HexColorId]?: number } = {};
   startingBoard.forEach((s) => {
     if (s.layers && s.layers.length > 0) {
@@ -95,32 +98,44 @@ export function generateProceduralLevel(
     }
   });
 
-  // Build incoming pool to guarantee each color can form full 10-stacks
+  // Build incoming pool:
+  // For EVERY color present on startingBoard, incoming pool provides the EXACT number of tiles
+  // needed so that (starting + pool) is an exact multiple of 10 (10, 20, etc.)
   const rawPieces: { color: HexColorId; count: number }[] = [];
   const targetColors: { [color in HexColorId]?: number } = {};
 
-  selectedColors.slice(0, Math.min(2 + Math.floor(difficulty / 2), selectedColors.length)).forEach((c) => {
-    const current = colorCounts[c] || 0;
-    const needed = Math.max(10 - (current % 10), 10);
+  Object.entries(colorCounts).forEach(([colorKey, count]) => {
+    const c = colorKey as HexColorId;
+    const current = count || 0;
+    const remainder = current % 10;
+    let needed = remainder === 0 ? 0 : 10 - remainder;
+
+    // If already 0 remainder but count is 0, give at least 10
+    if (needed === 0 && current === 0) {
+      needed = 10;
+    }
+
     let remaining = needed;
     while (remaining > 0) {
-      const piece = Math.min(remaining, 2 + Math.floor(rng() * 4));
+      const piece = Math.min(remaining, Math.max(2, Math.floor(rng() * 4) + 1));
       rawPieces.push({ color: c, count: piece });
       remaining -= piece;
     }
-    targetColors[c] = 1;
+
+    const totalExpected = current + needed;
+    targetColors[c] = Math.max(1, Math.floor(totalExpected / 10));
   });
 
+  // Shuffle raw pieces
   rawPieces.sort(() => rng() - 0.5);
 
   const incomingPool: { color: HexColorId; count: number; layers?: TileStackLayer[] }[] = [];
   if (allowMultiLayer && rawPieces.length >= 2) {
     let p = 0;
     while (p < rawPieces.length) {
-      // Chance of generating a multi-colored piece (2 or 3 layers)
-      const shouldBundle = rng() < 0.45 && p + 1 < rawPieces.length;
+      const shouldBundle = rng() < 0.4 && p + 1 < rawPieces.length;
       if (shouldBundle) {
-        const bundleLayersCount = rng() < 0.3 && p + 2 < rawPieces.length ? 3 : 2;
+        const bundleLayersCount = rng() < 0.25 && p + 2 < rawPieces.length ? 3 : 2;
         const bundled = rawPieces.slice(p, p + bundleLayersCount);
         p += bundleLayersCount;
         const layers: TileStackLayer[] = bundled.map((b) => ({ color: b.color, count: b.count }));
@@ -150,14 +165,27 @@ export function generateProceduralLevel(
     });
   }
 
-  const moveLimit = Math.max(14, incomingPool.length + 6 + difficulty * 2);
-  const targetScore = 1500 + difficulty * 800;
+  const moveLimit = Math.max(16, incomingPool.length + 8 + difficulty * 2);
+  const targetScore = 1200 + difficulty * 600;
+
+  // Primary objective target
+  const topTargets: { [color in HexColorId]?: number } = {};
+  const targetKeys = Object.keys(targetColors) as HexColorId[];
+  const requiredCount = Math.min(targetKeys.length, Math.max(1, difficulty));
+  targetKeys.slice(0, requiredCount).forEach((k) => {
+    topTargets[k] = 1;
+  });
 
   return {
     id,
     worldId: difficulty,
     title,
-    subtitle: mode === 'daily' ? 'Daily Brain Teaser' : mode === 'weekly' ? 'Weekly Mega Challenge' : 'Endless Trial',
+    subtitle:
+      mode === 'daily'
+        ? 'Daily Brain Teaser'
+        : mode === 'weekly'
+        ? 'Weekly Mega Challenge'
+        : 'Endless Trial',
     difficulty,
     boardRadius: radius,
     stackCapacity: 10,
@@ -165,10 +193,9 @@ export function generateProceduralLevel(
     startingBoard,
     incomingPool,
     objective: {
-      type: difficulty >= 4 ? 'target_score' : 'complete_colors',
-      description: difficulty >= 4 ? `Score ${targetScore} points` : `Complete target color stacks`,
-      targetColors: difficulty < 4 ? targetColors : undefined,
-      targetScore: difficulty >= 4 ? targetScore : undefined,
+      type: 'complete_colors',
+      description: `Complete ${requiredCount} full colour stack${requiredCount > 1 ? 's' : ''}`,
+      targetColors: topTargets,
       moveLimit,
     },
     starThresholds: [
@@ -198,19 +225,9 @@ export function validatePuzzle(level: LevelData): {
     };
   }
 
-  // Check matching color opportunities
-  let matchOpportunities = 0;
-  for (let i = 0; i < level.startingBoard.length; i++) {
-    for (let j = i + 1; j < level.startingBoard.length; j++) {
-      if (level.startingBoard[i].color === level.startingBoard[j].color) {
-        matchOpportunities++;
-      }
-    }
-  }
-
   return {
     isValid: true,
-    legalMovesEstimate: emptyCount + matchOpportunities + level.incomingPool.length,
+    legalMovesEstimate: emptyCount + level.incomingPool.length,
     message: `Level ${level.id} is validated and solvable. Empty spaces: ${emptyCount}, incoming tiles: ${level.incomingPool.length}.`,
   };
 }
