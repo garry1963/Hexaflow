@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { GameMode, PlayerProfile } from '../types';
 import { getTodayDailyStatus } from '../utils/dailyPuzzle';
+import { CAMPAIGN_LEVELS } from '../data/levels';
 
 interface MainMenuProps {
   profile: PlayerProfile;
@@ -29,6 +30,7 @@ interface MainMenuProps {
   onOpenSettings: () => void;
   onOpenDaily: () => void;
   onOpenWeekly: () => void;
+  onOpenGenerator: () => void;
   onOpenTutorial: () => void;
 }
 
@@ -41,9 +43,11 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   onOpenSettings,
   onOpenDaily,
   onOpenWeekly,
+  onOpenGenerator,
   onOpenTutorial,
 }) => {
   const completedCount = Object.keys(profile.completedLevels).length;
+  const totalCampaignLevels = CAMPAIGN_LEVELS.length;
   const dailyStatus = getTodayDailyStatus(profile);
 
   return (
@@ -175,7 +179,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               className="py-2.5 px-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/90 text-cyan-300 border border-slate-700 font-display font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition active:scale-98"
             >
               <Grid className="w-4 h-4" />
-              <span>Levels ({completedCount}/20)</span>
+              <span>Levels ({completedCount}/{totalCampaignLevels})</span>
             </button>
 
             <button
@@ -189,7 +193,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         </div>
 
         {/* Game Mode Grid: Tablet Cards */}
-        <div className="w-full max-w-3xl grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+        <div className="w-full max-w-4xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3 mt-6">
           {/* Daily Challenge */}
           <button
             onClick={onOpenDaily}
@@ -250,6 +254,18 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             </div>
             <span className="font-display font-bold text-sm text-white">Weekly</span>
             <span className="text-[11px] text-slate-400 mt-0.5">Mega Board</span>
+          </button>
+
+          {/* Puzzle Generator Mode */}
+          <button
+            onClick={onOpenGenerator}
+            className="flex flex-col items-center text-center p-3.5 md:p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-cyan-500/40 hover:border-cyan-400 shadow-md transition active:scale-95 group relative ring-1 ring-cyan-500/20"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center text-cyan-300 mb-2 group-hover:scale-110 transition shadow-inner">
+              <Sparkles className="w-5 h-5 text-cyan-400" />
+            </div>
+            <span className="font-display font-bold text-sm text-white">Generator</span>
+            <span className="text-[11px] text-cyan-400 font-semibold mt-0.5">Diff 1 - 5 & Archive</span>
           </button>
 
           {/* Endless Mode */}

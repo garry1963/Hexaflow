@@ -41,6 +41,8 @@ import {
   saveSettings,
   saveStats,
   saveUnlockedAchievements,
+  addPuzzleToArchive,
+  updateArchivedPuzzleResult,
 } from './utils/storage';
 import { soundManager } from './audio/soundManager';
 
@@ -61,6 +63,7 @@ import { StatsModal } from './components/StatsModal';
 import { SettingsModal } from './components/SettingsModal';
 import { DevToolsModal } from './components/DevToolsModal';
 import { TutorialModal } from './components/TutorialModal';
+import { PuzzleGeneratorModal } from './components/PuzzleGeneratorModal';
 import { Hammer, Sparkles } from 'lucide-react';
 
 interface UndoSnapshot {
@@ -261,6 +264,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showGeneratorModal, setShowGeneratorModal] = useState(false);
 
   // Undo History
   const [undoHistory, setUndoHistory] = useState<UndoSnapshot[]>([]);
@@ -449,7 +453,7 @@ export default function App() {
             stars: prev.stars + (newBestStars - (prevCompleted?.stars || 0)),
             currentLevel:
               gameMode === 'campaign' && levelData.id === prev.currentLevel
-                ? Math.min(prev.currentLevel + 1, 20)
+                ? Math.min(prev.currentLevel + 1, CAMPAIGN_LEVELS.length)
                 : prev.currentLevel,
             dailyStreak: isDailyMode ? nextStreak : prev.dailyStreak,
             lastDailyDate: isDailyMode ? todayStr : prev.lastDailyDate,
@@ -483,6 +487,10 @@ export default function App() {
             ? Math.max(prev.longestStreak, nextStreak)
             : prev.longestStreak,
         }));
+
+        if (gameMode === 'generator') {
+          updateArchivedPuzzleResult(levelData.id, currentScore, stars);
+        }
 
         saveActiveGame(null);
         return;
@@ -1070,6 +1078,8 @@ export default function App() {
       const weekSeed = dateToSeed(new Date().getFullYear() + '-W' + Math.ceil(new Date().getDate() / 7));
       const lvl = generateProceduralLevel(950, 'Weekly Mega Challenge', 4, weekSeed, 'weekly');
       startLevel(lvl, 'weekly');
+    } else if (mode === 'generator') {
+      setShowGeneratorModal(true);
     } else if (mode === 'endless') {
       const lvl = generateProceduralLevel(1, 'Endless Hex', 2, Date.now(), 'endless');
       startLevel(lvl, 'endless');
@@ -1077,6 +1087,11 @@ export default function App() {
       const lvl = CAMPAIGN_LEVELS[0];
       startLevel(lvl, 'relax');
     }
+  };
+
+  const handleStartGeneratedPuzzle = (lvl: LevelData) => {
+    addPuzzleToArchive(lvl);
+    startLevel(lvl, 'generator');
   };
 
   // Valid Drop Target IDs for Board
@@ -1115,6 +1130,7 @@ export default function App() {
           onOpenSettings={() => setShowSettings(true)}
           onOpenDaily={() => setShowDailyModal(true)}
           onOpenWeekly={() => setShowWeeklyModal(true)}
+          onOpenGenerator={() => setShowGeneratorModal(true)}
           onOpenTutorial={() => setShowTutorial(true)}
         />
       )}
@@ -1244,8 +1260,22 @@ export default function App() {
           isDaily={gameMode === 'daily'}
           dailyStreak={profile.dailyStreak}
           onNextLevel={() => {
-            const nextLvl = CAMPAIGN_LEVELS[levelData.id] || CAMPAIGN_LEVELS[0];
-            startLevel(nextLvl, 'campaign');
+            if (gameMode === 'generator') {
+              const nextSeed = Date.now() + Math.floor(Math.random() * 1000);
+              const nextGen = generateProceduralLevel(
+                nextSeed % 10000,
+                `Procedural Puzzle #${nextSeed % 1000}`,
+                levelData.difficulty,
+                nextSeed,
+                'generator',
+                { boardRadius: levelData.boardRadius }
+              );
+              addPuzzleToArchive(nextGen, nextSeed);
+              startLevel(nextGen, 'generator');
+            } else {
+              const nextLvl = CAMPAIGN_LEVELS[levelData.id] || CAMPAIGN_LEVELS[0];
+              startLevel(nextLvl, 'campaign');
+            }
           }}
           onReplay={() => startLevel(levelData, gameMode)}
           onLevelSelect={() => {
@@ -1256,7 +1286,7 @@ export default function App() {
             setIsComplete(false);
             setActiveView('menu');
           }}
-          hasNextLevel={gameMode === 'campaign' && levelData.id < 20}
+          hasNextLevel={(gameMode === 'campaign' && levelData.id < CAMPAIGN_LEVELS.length) || gameMode === 'generator'}
         />
       )}
 
@@ -1324,6 +1354,7 @@ export default function App() {
             const lvl = CAMPAIGN_LEVELS[id - 1];
             if (lvl) startLevel(lvl, 'campaign');
           }}
+          onOpenGenerator={() => setShowGeneratorModal(true)}
           onClose={() => setShowLevelSelect(false)}
         />
       )}
@@ -1404,6 +1435,7 @@ export default function App() {
             const lvl = CAMPAIGN_LEVELS[id - 1];
             if (lvl) startLevel(lvl, 'campaign');
           }}
+          onStartGeneratedLevel={handleStartGeneratedPuzzle}
           onAddCurrency={(coins, xp) => {
             setProfile((prev) => ({
               ...prev,
@@ -1419,13 +1451,20 @@ export default function App() {
               });
               return {
                 ...prev,
-                currentLevel: 20,
-                stars: 60,
+                currentLevel: CAMPAIGN_LEVELS.length,
+                stars: CAMPAIGN_LEVELS.length * 3,
                 completedLevels: allCompleted,
               };
             });
           }}
           onClose={() => setShowDevTools(false)}
+        />
+      )}
+
+      {showGeneratorModal && (
+        <PuzzleGeneratorModal
+          onStartGeneratedPuzzle={handleStartGeneratedPuzzle}
+          onClose={() => setShowGeneratorModal(false)}
         />
       )}
 

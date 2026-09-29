@@ -12,6 +12,7 @@ interface DevToolsModalProps {
   onUnlockAllLevels: () => void;
   onClose: () => void;
   activeLevelData?: LevelData;
+  onStartGeneratedLevel?: (level: LevelData) => void;
 }
 
 export const DevToolsModal: React.FC<DevToolsModalProps> = ({
@@ -21,8 +22,11 @@ export const DevToolsModal: React.FC<DevToolsModalProps> = ({
   onUnlockAllLevels,
   onClose,
   activeLevelData,
+  onStartGeneratedLevel,
 }) => {
   const [testSeed, setTestSeed] = useState<number>(12345);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<1 | 2 | 3 | 4 | 5>(3);
+  const [lastGenerated, setLastGenerated] = useState<LevelData | null>(null);
   const [validationResult, setValidationResult] = useState<string>('');
   const [jsonExport, setJsonExport] = useState<string>('');
 
@@ -35,10 +39,11 @@ export const DevToolsModal: React.FC<DevToolsModalProps> = ({
   };
 
   const handleGenerate = () => {
-    const gen = generateProceduralLevel(999, 'Dev Test Level', 3, testSeed, 'daily');
+    const gen = generateProceduralLevel(999, `Dev Level (Diff ${selectedDifficulty})`, selectedDifficulty, testSeed, 'daily');
     const res = validatePuzzle(gen);
+    setLastGenerated(gen);
     setValidationResult(
-      `GENERATED TEST PUZZLE (Seed ${testSeed}):\n${res.message}\nObjective: ${gen.objective.description}\nColors: ${gen.availableColors.join(', ')}`
+      `GENERATED TEST PUZZLE (Diff ${selectedDifficulty}, Seed ${testSeed}):\n${res.message}\nObjective: ${gen.objective.description}\nColors: ${gen.availableColors.join(', ')}\nIncoming pool pieces: ${gen.incomingPool.length}`
     );
   };
 
@@ -108,7 +113,7 @@ export const DevToolsModal: React.FC<DevToolsModalProps> = ({
                 className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500 text-emerald-300 rounded font-bold flex items-center gap-1"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Unlock All 20 Levels</span>
+                <span>Unlock All {CAMPAIGN_LEVELS.length} Levels</span>
               </button>
             </div>
           </div>
@@ -116,7 +121,29 @@ export const DevToolsModal: React.FC<DevToolsModalProps> = ({
           {/* Solver & Validator */}
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
             <span className="text-slate-400 block mb-2 font-bold">Solver & Puzzle Validator:</span>
-            <div className="flex items-center gap-2 mb-2">
+            
+            {/* Difficulty Selector */}
+            <div className="mb-2">
+              <span className="text-slate-400 block mb-1 font-semibold text-[11px]">Generator Difficulty:</span>
+              <div className="grid grid-cols-5 gap-1">
+                {([1, 2, 3, 4, 5] as const).map((diff) => (
+                  <button
+                    key={diff}
+                    type="button"
+                    onClick={() => setSelectedDifficulty(diff)}
+                    className={`py-1 rounded text-center font-bold text-[10px] transition border ${
+                      selectedDifficulty === diff
+                        ? 'bg-amber-500 border-amber-400 text-slate-950 shadow'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    Diff {diff}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <button
                 onClick={runValidation}
                 className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 rounded font-bold"
@@ -127,8 +154,19 @@ export const DevToolsModal: React.FC<DevToolsModalProps> = ({
                 onClick={handleGenerate}
                 className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-bold"
               >
-                Test Generator (Seed {testSeed})
+                Generate Level (Diff {selectedDifficulty})
               </button>
+              {lastGenerated && onStartGeneratedLevel && (
+                <button
+                  onClick={() => {
+                    onStartGeneratedLevel(lastGenerated);
+                    onClose();
+                  }}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded font-bold"
+                >
+                  Play Generated Level
+                </button>
+              )}
             </div>
             {validationResult && (
               <pre className="p-2 bg-slate-900 rounded border border-slate-800 text-emerald-400 text-[11px] whitespace-pre-wrap">

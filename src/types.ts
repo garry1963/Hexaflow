@@ -113,7 +113,21 @@ export interface LevelData {
   tips?: string;
 }
 
-export type GameMode = 'campaign' | 'daily' | 'weekly' | 'endless' | 'relax';
+export type GameMode = 'campaign' | 'daily' | 'weekly' | 'endless' | 'relax' | 'generator';
+
+export interface ArchivedPuzzle {
+  id: string;
+  title: string;
+  subtitle?: string;
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  seed: number;
+  levelData: LevelData;
+  createdAt: string;
+  timesPlayed: number;
+  bestScore?: number;
+  isCompleted?: boolean;
+  starsEarned?: number;
+}
 
 export type BoosterType = 'undo' | 'shuffle' | 'hammer' | 'wild_hex' | 'extra_space' | 'extra_moves';
 

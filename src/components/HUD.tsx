@@ -95,11 +95,18 @@ export const HUD: React.FC<HUDProps> = ({
                   ? 'Weekly Challenge'
                   : mode === 'endless'
                   ? 'Endless Mode'
-                  : 'Relax Mode'}
+                  : mode === 'relax'
+                  ? 'Relax Mode'
+                  : `Generator • Diff ${level.difficulty}`}
               </span>
               {mode === 'daily' && (
                 <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.2 rounded border border-amber-500/40">
                   1 Attempt
+                </span>
+              )}
+              {mode === 'generator' && (
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 font-bold px-1.5 py-0.5 rounded border border-cyan-500/40">
+                  Diff {level.difficulty}
                 </span>
               )}
               {/* Optional secret Dev tools access */}

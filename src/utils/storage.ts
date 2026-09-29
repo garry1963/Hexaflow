@@ -1,8 +1,10 @@
 import {
   ActiveGameState,
   Achievement,
+  ArchivedPuzzle,
   GameSettings,
   GameStats,
+  LevelData,
   PlayerProfile,
 } from '../types';
 
@@ -12,6 +14,7 @@ const STORAGE_KEYS = {
   SETTINGS: 'hexaflow_settings_v1',
   ACTIVE_GAME: 'hexaflow_active_game_v1',
   UNLOCKED_ACHIEVEMENTS: 'hexaflow_achievements_v1',
+  PUZZLE_ARCHIVE: 'hexaflow_puzzle_archive_v1',
 };
 
 export const INITIAL_PROFILE: PlayerProfile = {
@@ -146,12 +149,23 @@ export const ACHIEVEMENTS_LIST: Achievement[] = [
   {
     id: 'hex_champion',
     name: 'Hex Champion',
-    description: 'Complete all 20 campaign levels.',
+    description: 'Complete 20 campaign levels.',
     icon: '👑',
     target: 20,
     current: (_, profile) => Object.keys(profile.completedLevels).length,
     rewardCoins: 500,
     rewardXP: 500,
+    unlocked: false,
+  },
+  {
+    id: 'grand_apex_master',
+    name: 'Grand Apex Master',
+    description: 'Conquer all 35 campaign levels.',
+    icon: '🏆',
+    target: 35,
+    current: (_, profile) => Object.keys(profile.completedLevels).length,
+    rewardCoins: 1000,
+    rewardXP: 1000,
     unlocked: false,
   },
   {
@@ -277,3 +291,97 @@ export function saveUnlockedAchievements(unlockedIds: string[]): void {
 export function clearAllGameData(): void {
   Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
 }
+
+export function loadPuzzleArchive(): ArchivedPuzzle[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PUZZLE_ARCHIVE);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.warn('Failed to load puzzle archive', e);
+  }
+  return [];
+}
+
+export function savePuzzleArchive(archive: ArchivedPuzzle[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PUZZLE_ARCHIVE, JSON.stringify(archive));
+  } catch (e) {
+    console.warn('Failed to save puzzle archive', e);
+  }
+}
+
+export function addPuzzleToArchive(level: LevelData, seed: number = Date.now()): ArchivedPuzzle {
+  const currentArchive = loadPuzzleArchive();
+  const puzzleId = `puzzle_${level.difficulty}_${seed}`;
+
+  // Check if a puzzle with same id or same title + difficulty exists
+  const existingIdx = currentArchive.findIndex(
+    (p) => p.id === puzzleId || (p.title === level.title && p.difficulty === level.difficulty)
+  );
+
+  if (existingIdx !== -1) {
+    const existing = currentArchive[existingIdx];
+    const updated: ArchivedPuzzle = {
+      ...existing,
+      timesPlayed: (existing.timesPlayed || 1) + 1,
+      levelData: level,
+    };
+    currentArchive[existingIdx] = updated;
+    savePuzzleArchive(currentArchive);
+    return updated;
+  }
+
+  const newEntry: ArchivedPuzzle = {
+    id: puzzleId,
+    title: level.title,
+    subtitle: level.subtitle,
+    difficulty: level.difficulty,
+    seed,
+    levelData: level,
+    createdAt: new Date().toISOString(),
+    timesPlayed: 1,
+  };
+
+  const updatedArchive = [newEntry, ...currentArchive];
+  savePuzzleArchive(updatedArchive);
+  return newEntry;
+}
+
+export function updateArchivedPuzzleResult(
+  levelIdOrTitle: string | number,
+  score: number,
+  stars: number
+): void {
+  const currentArchive = loadPuzzleArchive();
+  let modified = false;
+
+  const updated = currentArchive.map((p) => {
+    if (
+      p.id === String(levelIdOrTitle) ||
+      p.levelData.id === levelIdOrTitle ||
+      p.title === String(levelIdOrTitle)
+    ) {
+      modified = true;
+      return {
+        ...p,
+        isCompleted: true,
+        bestScore: Math.max(p.bestScore || 0, score),
+        starsEarned: Math.max(p.starsEarned || 0, stars),
+      };
+    }
+    return p;
+  });
+
+  if (modified) {
+    savePuzzleArchive(updated);
+  }
+}
+
+export function deleteArchivedPuzzle(puzzleId: string): void {
+  const currentArchive = loadPuzzleArchive();
+  const updated = currentArchive.filter((p) => p.id !== puzzleId);
+  savePuzzleArchive(updated);
+}
+

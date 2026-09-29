@@ -32,23 +32,69 @@ export function generateProceduralLevel(
   title: string,
   difficulty: 1 | 2 | 3 | 4 | 5,
   seed: number = Date.now(),
-  mode: 'daily' | 'weekly' | 'endless' = 'daily'
+  mode: 'daily' | 'weekly' | 'endless' | 'generator' = 'daily',
+  options?: { boardRadius?: number }
 ): LevelData {
   const rng = seededRandom(seed);
 
   // Number of colors based on difficulty
-  const numColors = Math.min(difficulty + 1, 5);
+  const numColors =
+    difficulty === 1 ? 2 : difficulty === 2 ? 3 : difficulty === 3 ? 4 : difficulty === 4 ? 4 : 5;
   const shuffledColors = [...COLOR_KEYS.filter((c) => c !== 'wild-rainbow')].sort(
     () => rng() - 0.5
   );
   const selectedColors = shuffledColors.slice(0, numColors);
 
-  const radius = mode === 'weekly' ? 2 : difficulty >= 3 ? 2 : 1;
+  const radius =
+    options?.boardRadius !== undefined
+      ? options.boardRadius
+      : mode === 'weekly'
+      ? 2
+      : difficulty >= 3
+      ? 2
+      : 1;
   const allCells = generateHexHoneycomb(radius);
 
+  // Custom Cells based on difficulty
+  const customCells: {
+    id: string;
+    q: number;
+    r: number;
+    isBlocked?: boolean;
+    isLocked?: boolean;
+    lockRequirement?: { type: 'merges' | 'score'; target: number; current: number };
+    bonusMultiplier?: number;
+  }[] = [];
+
+  if (radius >= 2) {
+    if (difficulty === 3) {
+      customCells.push({ id: '0_0', q: 0, r: 0, bonusMultiplier: 2 });
+    } else if (difficulty === 4) {
+      customCells.push({ id: '1_-1', q: 1, r: -1, bonusMultiplier: 2 });
+      customCells.push({ id: '-1_1', q: -1, r: 1, bonusMultiplier: 2 });
+    } else if (difficulty === 5) {
+      customCells.push({ id: '0_0', q: 0, r: 0, bonusMultiplier: 3 });
+      customCells.push({
+        id: '0_2',
+        q: 0,
+        r: 2,
+        isLocked: true,
+        lockRequirement: { type: 'merges', target: 3, current: 0 },
+      });
+    }
+  }
+
+  // Filter available cells (excluding obstacles/blocked) for starting stacks
+  const playableCells = allCells.filter(
+    (c) => !customCells.some((cc) => cc.id === c.id && (cc.isBlocked || cc.isLocked))
+  );
+
   // Pick starting stack locations
-  const numStarting = Math.min(3 + difficulty, Math.floor(allCells.length * 0.55));
-  const startingIndices = allCells
+  const numStarting = Math.min(
+    difficulty === 1 ? 3 : difficulty === 2 ? 4 : 3 + difficulty,
+    Math.floor(playableCells.length * 0.5)
+  );
+  const startingIndices = playableCells
     .map((_, i) => i)
     .sort(() => rng() - 0.5)
     .slice(0, numStarting);
@@ -57,7 +103,7 @@ export function generateProceduralLevel(
   const allowMultiLayer = difficulty >= 2 || mode === 'weekly';
 
   const startingBoard = startingIndices.map((cellIdx) => {
-    const cell = allCells[cellIdx];
+    const cell = playableCells[cellIdx];
     if (!allowMultiLayer) {
       const color = selectedColors[Math.floor(rng() * selectedColors.length)];
       const count = 3 + Math.floor(rng() * 4); // 3 to 6
@@ -69,8 +115,8 @@ export function generateProceduralLevel(
       };
     }
 
-    const numLayers = Math.min(2 + Math.floor(rng() * 2), selectedColors.length);
-    const stackColors = [...selectedColors].sort(() => rng() - 0.5).slice(0, numLayers);
+    const maxLayers = difficulty === 2 ? 2 : Math.min(2 + Math.floor(rng() * 2), selectedColors.length);
+    const stackColors = [...selectedColors].sort(() => rng() - 0.5).slice(0, maxLayers);
     const layers: TileStackLayer[] = stackColors.map((col) => ({
       color: col,
       count: 2 + Math.floor(rng() * 3), // 2 to 4
@@ -133,9 +179,9 @@ export function generateProceduralLevel(
   if (allowMultiLayer && rawPieces.length >= 2) {
     let p = 0;
     while (p < rawPieces.length) {
-      const shouldBundle = rng() < 0.4 && p + 1 < rawPieces.length;
+      const shouldBundle = rng() < (difficulty >= 4 ? 0.5 : 0.35) && p + 1 < rawPieces.length;
       if (shouldBundle) {
-        const bundleLayersCount = rng() < 0.25 && p + 2 < rawPieces.length ? 3 : 2;
+        const bundleLayersCount = rng() < 0.25 && p + 2 < rawPieces.length && difficulty >= 3 ? 3 : 2;
         const bundled = rawPieces.slice(p, p + bundleLayersCount);
         p += bundleLayersCount;
         const layers: TileStackLayer[] = bundled.map((b) => ({ color: b.color, count: b.count }));
@@ -165,29 +211,43 @@ export function generateProceduralLevel(
     });
   }
 
-  const moveLimit = Math.max(16, incomingPool.length + 8 + difficulty * 2);
-  const targetScore = 1200 + difficulty * 600;
+  const bonusMoves = difficulty === 1 ? 14 : difficulty === 2 ? 12 : difficulty === 3 ? 10 : 8;
+  const moveLimit = Math.max(16, incomingPool.length + bonusMoves);
+  const targetScore = 1000 + difficulty * 600;
 
   // Primary objective target
   const topTargets: { [color in HexColorId]?: number } = {};
   const targetKeys = Object.keys(targetColors) as HexColorId[];
-  const requiredCount = Math.min(targetKeys.length, Math.max(1, difficulty));
+  const requiredCount = Math.min(targetKeys.length, Math.max(1, difficulty === 1 ? 1 : difficulty === 2 ? 2 : 3));
   targetKeys.slice(0, requiredCount).forEach((k) => {
     topTargets[k] = 1;
   });
+
+  const subtitle =
+    mode === 'daily'
+      ? 'Daily Brain Teaser'
+      : mode === 'weekly'
+      ? 'Weekly Mega Challenge'
+      : mode === 'endless'
+      ? 'Endless Trial'
+      : difficulty === 1
+      ? 'Level 1 Beginner • Pure Flow'
+      : difficulty === 2
+      ? 'Level 2 Casual • Gentle Cascades'
+      : difficulty === 3
+      ? 'Level 3 Medium • Multi-Layer Stacks'
+      : difficulty === 4
+      ? 'Level 4 Hard • Deep Stacks & Multipliers'
+      : 'Level 5 Expert • Obstacles & Mastermind';
 
   return {
     id,
     worldId: difficulty,
     title,
-    subtitle:
-      mode === 'daily'
-        ? 'Daily Brain Teaser'
-        : mode === 'weekly'
-        ? 'Weekly Mega Challenge'
-        : 'Endless Trial',
+    subtitle,
     difficulty,
     boardRadius: radius,
+    customCells: customCells.length > 0 ? customCells : undefined,
     stackCapacity: 10,
     availableColors: selectedColors,
     startingBoard,

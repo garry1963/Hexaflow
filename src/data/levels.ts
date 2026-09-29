@@ -916,10 +916,10 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     starThresholds: [3000, 4500, 6200],
   },
 
-  // WORLD 5 — EXPERT (Levels 19 - 20)
+  // WORLD 4 — ADVANCED (Levels 16 - 20)
   {
     id: 19,
-    worldId: 5,
+    worldId: 4,
     title: 'Master Fortress',
     subtitle: 'Obstacles and locked perimeters',
     difficulty: 5,
@@ -988,7 +988,7 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
   },
   {
     id: 20,
-    worldId: 5,
+    worldId: 4,
     title: 'Hexaflow Grandmaster',
     subtitle: 'The ultimate sorting symphony',
     difficulty: 5,
@@ -1052,5 +1052,1007 @@ export const CAMPAIGN_LEVELS: LevelData[] = [
     },
     starThresholds: [4000, 6000, 8500],
     tips: 'Trigger chain cascades to multiply combos up to 10x!',
+  },
+
+  // WORLD 5 — CRYSTAL CAVERNS (Levels 21 - 25)
+  {
+    id: 21,
+    worldId: 5,
+    title: 'Prismatic Core',
+    subtitle: 'Teal and Purple dual core',
+    difficulty: 3,
+    boardRadius: 2,
+    stackCapacity: 10,
+    availableColors: ['ocean-teal', 'royal-purple', 'sunburst-yellow'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'ocean-teal',
+        count: 7,
+        layers: [
+          { color: 'sunburst-yellow', count: 3 },
+          { color: 'ocean-teal', count: 4 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'royal-purple',
+        count: 6,
+        layers: [
+          { color: 'ocean-teal', count: 3 },
+          { color: 'royal-purple', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'sunburst-yellow',
+        count: 6,
+        layers: [
+          { color: 'royal-purple', count: 3 },
+          { color: 'sunburst-yellow', count: 3 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'ocean-teal', count: 3 },
+      { color: 'royal-purple', count: 4 },
+      { color: 'sunburst-yellow', count: 4 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Complete 1 Teal, 1 Purple, and 1 Yellow stack',
+      targetColors: { 'ocean-teal': 1, 'royal-purple': 1, 'sunburst-yellow': 1 },
+      moveLimit: 20,
+    },
+    starThresholds: [1800, 3200, 4800],
+    tips: 'Uncover the buried colors by merging the top layers into adjacent stacks.',
+  },
+  {
+    id: 22,
+    worldId: 5,
+    title: 'Vault of Whispers',
+    subtitle: 'Merge stacks to unlock secret chambers',
+    difficulty: 3,
+    boardRadius: 2,
+    customCells: [
+      { id: '0_2', q: 0, r: 2, isLocked: true, lockRequirement: { type: 'merges', target: 3, current: 0 } },
+      { id: '0_-2', q: 0, r: -2, isLocked: true, lockRequirement: { type: 'merges', target: 3, current: 0 } },
+    ],
+    stackCapacity: 10,
+    availableColors: ['tangerine-orange', 'cyan-breeze', 'emerald-green'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'tangerine-orange',
+        count: 7,
+        layers: [
+          { color: 'cyan-breeze', count: 3 },
+          { color: 'tangerine-orange', count: 4 },
+        ],
+      },
+      {
+        cellId: '1_-1',
+        color: 'cyan-breeze',
+        count: 6,
+        layers: [
+          { color: 'emerald-green', count: 3 },
+          { color: 'cyan-breeze', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_1',
+        color: 'emerald-green',
+        count: 6,
+        layers: [
+          { color: 'tangerine-orange', count: 2 },
+          { color: 'emerald-green', count: 4 },
+        ],
+      },
+      { cellId: '1_0', color: 'tangerine-orange', count: 2 },
+    ],
+    incomingPool: [
+      { color: 'tangerine-orange', count: 2 },
+      { color: 'cyan-breeze', count: 4 },
+      { color: 'emerald-green', count: 3 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Complete 3 full color stacks and open the vaults',
+      targetColors: { 'tangerine-orange': 1, 'cyan-breeze': 1, 'emerald-green': 1 },
+      moveLimit: 22,
+    },
+    starThresholds: [2000, 3500, 5200],
+    tips: 'Every merge brings the locked chambers closer to opening, giving you more space.',
+  },
+  {
+    id: 23,
+    worldId: 5,
+    title: 'Twin Citadels',
+    subtitle: 'Twin obstacles channeling lateral streams',
+    difficulty: 4,
+    boardRadius: 2,
+    customCells: [
+      { id: '0_1', q: 0, r: 1, isBlocked: true },
+      { id: '0_-1', q: 0, r: -1, isBlocked: true },
+    ],
+    stackCapacity: 10,
+    availableColors: ['ruby-red', 'bubblegum-pink', 'azure-blue', 'lime-spring'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'ruby-red',
+        count: 6,
+        layers: [
+          { color: 'lime-spring', count: 2 },
+          { color: 'ruby-red', count: 4 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'azure-blue',
+        count: 6,
+        layers: [
+          { color: 'bubblegum-pink', count: 3 },
+          { color: 'azure-blue', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'bubblegum-pink',
+        count: 7,
+        layers: [
+          { color: 'azure-blue', count: 3 },
+          { color: 'bubblegum-pink', count: 4 },
+        ],
+      },
+      {
+        cellId: '1_-1',
+        color: 'lime-spring',
+        count: 6,
+        layers: [
+          { color: 'ruby-red', count: 2 },
+          { color: 'lime-spring', count: 4 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'ruby-red', count: 4 },
+      { color: 'bubblegum-pink', count: 3 },
+      { color: 'azure-blue', count: 4 },
+      { color: 'lime-spring', count: 4 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Route tiles around the citadel barriers to complete 3 stacks',
+      targetColors: { 'ruby-red': 1, 'bubblegum-pink': 1, 'azure-blue': 1 },
+      moveLimit: 24,
+    },
+    starThresholds: [2400, 4000, 6000],
+  },
+  {
+    id: 24,
+    worldId: 5,
+    title: 'Kinetic Resonance',
+    subtitle: 'Harness triple score multipliers',
+    difficulty: 4,
+    boardRadius: 2,
+    customCells: [
+      { id: '-1_0', q: -1, r: 0, bonusMultiplier: 3 },
+      { id: '1_0', q: 1, r: 0, bonusMultiplier: 3 },
+    ],
+    stackCapacity: 10,
+    availableColors: ['tangerine-orange', 'azure-blue', 'sunburst-yellow', 'orchid-magenta'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'tangerine-orange',
+        count: 7,
+        layers: [
+          { color: 'orchid-magenta', count: 3 },
+          { color: 'tangerine-orange', count: 4 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'azure-blue',
+        count: 6,
+        layers: [
+          { color: 'sunburst-yellow', count: 3 },
+          { color: 'azure-blue', count: 3 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'sunburst-yellow',
+        count: 6,
+        layers: [
+          { color: 'tangerine-orange', count: 2 },
+          { color: 'sunburst-yellow', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_-1',
+        color: 'orchid-magenta',
+        count: 6,
+        layers: [
+          { color: 'azure-blue', count: 2 },
+          { color: 'orchid-magenta', count: 4 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'tangerine-orange', count: 4 },
+      { color: 'azure-blue', count: 5 },
+      { color: 'sunburst-yellow', count: 3 },
+      { color: 'orchid-magenta', count: 3 },
+    ],
+    objective: {
+      type: 'target_score',
+      description: 'Score 5,500 points using the 3x catalyst hexes',
+      targetScore: 5500,
+      moveLimit: 22,
+    },
+    starThresholds: [3500, 5500, 7500],
+    tips: 'Merges completed on the glowing 3x cells triple your score output!',
+  },
+  {
+    id: 25,
+    worldId: 5,
+    title: 'Obsidian Gate',
+    subtitle: 'Score 1,500 to crack open the sealed vault',
+    difficulty: 4,
+    boardRadius: 2,
+    customCells: [
+      { id: '0_0', q: 0, r: 0, isLocked: true, lockRequirement: { type: 'score', target: 1500, current: 0 } },
+    ],
+    stackCapacity: 10,
+    availableColors: ['royal-purple', 'emerald-green', 'cyan-breeze', 'ruby-red'],
+    startingBoard: [
+      {
+        cellId: '1_0',
+        color: 'royal-purple',
+        count: 7,
+        layers: [
+          { color: 'ruby-red', count: 3 },
+          { color: 'royal-purple', count: 4 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'emerald-green',
+        count: 6,
+        layers: [
+          { color: 'cyan-breeze', count: 2 },
+          { color: 'emerald-green', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'cyan-breeze',
+        count: 7,
+        layers: [
+          { color: 'emerald-green', count: 3 },
+          { color: 'cyan-breeze', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_-1',
+        color: 'ruby-red',
+        count: 5,
+        layers: [
+          { color: 'royal-purple', count: 2 },
+          { color: 'ruby-red', count: 3 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'royal-purple', count: 4 },
+      { color: 'emerald-green', count: 3 },
+      { color: 'cyan-breeze', count: 4 },
+      { color: 'ruby-red', count: 4 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Unlock the central Obsidian Gate and complete 3 stacks',
+      targetColors: { 'royal-purple': 1, 'emerald-green': 1, 'cyan-breeze': 1 },
+      moveLimit: 25,
+    },
+    starThresholds: [2800, 4500, 6500],
+  },
+
+  // WORLD 6 — QUANTUM SWARM (Levels 26 - 30)
+  {
+    id: 26,
+    worldId: 6,
+    title: 'Superposition',
+    subtitle: 'Tri-color multi-layer balance',
+    difficulty: 4,
+    boardRadius: 2,
+    stackCapacity: 10,
+    availableColors: ['bubblegum-pink', 'orchid-magenta', 'lime-spring', 'ocean-teal'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'bubblegum-pink',
+        count: 7,
+        layers: [
+          { color: 'ocean-teal', count: 2 },
+          { color: 'lime-spring', count: 2 },
+          { color: 'bubblegum-pink', count: 3 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'orchid-magenta',
+        count: 7,
+        layers: [
+          { color: 'bubblegum-pink', count: 2 },
+          { color: 'ocean-teal', count: 2 },
+          { color: 'orchid-magenta', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'lime-spring',
+        count: 7,
+        layers: [
+          { color: 'orchid-magenta', count: 2 },
+          { color: 'bubblegum-pink', count: 2 },
+          { color: 'lime-spring', count: 3 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'ocean-teal',
+        count: 7,
+        layers: [
+          { color: 'lime-spring', count: 2 },
+          { color: 'orchid-magenta', count: 2 },
+          { color: 'ocean-teal', count: 3 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'bubblegum-pink', count: 3 },
+      { color: 'orchid-magenta', count: 3 },
+      { color: 'lime-spring', count: 3 },
+      { color: 'ocean-teal', count: 3 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Complete 3 full color stacks across 4 layered species',
+      targetColors: { 'bubblegum-pink': 1, 'orchid-magenta': 1, 'lime-spring': 1 },
+      moveLimit: 24,
+    },
+    starThresholds: [3000, 4800, 6800],
+  },
+  {
+    id: 27,
+    worldId: 6,
+    title: 'Quantum Entanglement',
+    subtitle: 'Twin locks guarding the outer periphery',
+    difficulty: 5,
+    boardRadius: 2,
+    customCells: [
+      { id: '-1_-1', q: -1, r: -1, isLocked: true, lockRequirement: { type: 'merges', target: 4, current: 0 } },
+      { id: '1_1', q: 1, r: 1, isLocked: true, lockRequirement: { type: 'merges', target: 4, current: 0 } },
+    ],
+    stackCapacity: 10,
+    availableColors: ['azure-blue', 'sunburst-yellow', 'ruby-red', 'emerald-green'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'azure-blue',
+        count: 7,
+        layers: [
+          { color: 'ruby-red', count: 2 },
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'azure-blue', count: 3 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'sunburst-yellow',
+        count: 7,
+        layers: [
+          { color: 'azure-blue', count: 2 },
+          { color: 'emerald-green', count: 2 },
+          { color: 'sunburst-yellow', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'ruby-red',
+        count: 7,
+        layers: [
+          { color: 'emerald-green', count: 2 },
+          { color: 'azure-blue', count: 2 },
+          { color: 'ruby-red', count: 3 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'emerald-green',
+        count: 7,
+        layers: [
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'ruby-red', count: 2 },
+          { color: 'emerald-green', count: 3 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'azure-blue', count: 3 },
+      { color: 'sunburst-yellow', count: 3 },
+      { color: 'ruby-red', count: 3 },
+      { color: 'emerald-green', count: 3 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Complete all 4 primary color stacks',
+      targetColors: { 'azure-blue': 1, 'sunburst-yellow': 1, 'ruby-red': 1, 'emerald-green': 1 },
+      moveLimit: 26,
+    },
+    starThresholds: [3500, 5500, 7800],
+  },
+  {
+    id: 28,
+    worldId: 6,
+    title: 'Event Horizon',
+    subtitle: 'Central black hole with outer orbital acceleration',
+    difficulty: 5,
+    boardRadius: 2,
+    customCells: [
+      { id: '0_0', q: 0, r: 0, isBlocked: true },
+      { id: '-2_1', q: -2, r: 1, bonusMultiplier: 2 },
+      { id: '2_-1', q: 2, r: -1, bonusMultiplier: 2 },
+    ],
+    stackCapacity: 10,
+    availableColors: ['tangerine-orange', 'cyan-breeze', 'royal-purple', 'bubblegum-pink'],
+    startingBoard: [
+      {
+        cellId: '1_0',
+        color: 'cyan-breeze',
+        count: 7,
+        layers: [
+          { color: 'royal-purple', count: 3 },
+          { color: 'cyan-breeze', count: 4 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'tangerine-orange',
+        count: 7,
+        layers: [
+          { color: 'bubblegum-pink', count: 3 },
+          { color: 'tangerine-orange', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'bubblegum-pink',
+        count: 6,
+        layers: [
+          { color: 'tangerine-orange', count: 2 },
+          { color: 'bubblegum-pink', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_-1',
+        color: 'royal-purple',
+        count: 6,
+        layers: [
+          { color: 'cyan-breeze', count: 2 },
+          { color: 'royal-purple', count: 4 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'tangerine-orange', count: 4 },
+      { color: 'cyan-breeze', count: 4 },
+      { color: 'royal-purple', count: 3 },
+      { color: 'bubblegum-pink', count: 3 },
+    ],
+    objective: {
+      type: 'target_score',
+      description: 'Score 6,000 points while navigating the event horizon',
+      targetScore: 6000,
+      moveLimit: 24,
+    },
+    starThresholds: [3800, 6000, 8500],
+  },
+  {
+    id: 29,
+    worldId: 6,
+    title: 'Gravitational Pull',
+    subtitle: 'Tight 18 moves with 3-layer cascades',
+    difficulty: 5,
+    boardRadius: 2,
+    stackCapacity: 10,
+    availableColors: ['lime-spring', 'ocean-teal', 'sunburst-yellow', 'orchid-magenta'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'lime-spring',
+        count: 7,
+        layers: [
+          { color: 'orchid-magenta', count: 2 },
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'lime-spring', count: 3 },
+        ],
+      },
+      {
+        cellId: '1_-1',
+        color: 'ocean-teal',
+        count: 7,
+        layers: [
+          { color: 'lime-spring', count: 2 },
+          { color: 'orchid-magenta', count: 2 },
+          { color: 'ocean-teal', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_1',
+        color: 'sunburst-yellow',
+        count: 7,
+        layers: [
+          { color: 'ocean-teal', count: 2 },
+          { color: 'lime-spring', count: 2 },
+          { color: 'sunburst-yellow', count: 3 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'orchid-magenta',
+        count: 7,
+        layers: [
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'ocean-teal', count: 2 },
+          { color: 'orchid-magenta', count: 3 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'lime-spring', count: 3 },
+      { color: 'ocean-teal', count: 3 },
+      { color: 'sunburst-yellow', count: 3 },
+      { color: 'orchid-magenta', count: 3 },
+    ],
+    objective: {
+      type: 'limited_moves',
+      description: 'Complete 3 color stacks within a strict 18 moves',
+      targetColors: { 'lime-spring': 1, 'ocean-teal': 1, 'orchid-magenta': 1 },
+      moveLimit: 18,
+    },
+    starThresholds: [3200, 5200, 7200],
+  },
+  {
+    id: 30,
+    worldId: 6,
+    title: 'Singularity Pulse',
+    subtitle: 'Score 7,000 points across 5 rich colors',
+    difficulty: 5,
+    boardRadius: 2,
+    customCells: [
+      { id: '0_0', q: 0, r: 0, bonusMultiplier: 2 },
+      { id: '-1_1', q: -1, r: 1, bonusMultiplier: 2 },
+    ],
+    stackCapacity: 10,
+    availableColors: ['ruby-red', 'azure-blue', 'emerald-green', 'sunburst-yellow', 'royal-purple'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'ruby-red',
+        count: 7,
+        layers: [
+          { color: 'royal-purple', count: 2 },
+          { color: 'emerald-green', count: 2 },
+          { color: 'ruby-red', count: 3 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'azure-blue',
+        count: 7,
+        layers: [
+          { color: 'ruby-red', count: 2 },
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'azure-blue', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'emerald-green',
+        count: 7,
+        layers: [
+          { color: 'azure-blue', count: 2 },
+          { color: 'royal-purple', count: 2 },
+          { color: 'emerald-green', count: 3 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'sunburst-yellow',
+        count: 7,
+        layers: [
+          { color: 'emerald-green', count: 2 },
+          { color: 'ruby-red', count: 2 },
+          { color: 'sunburst-yellow', count: 3 },
+        ],
+      },
+      {
+        cellId: '0_-1',
+        color: 'royal-purple',
+        count: 7,
+        layers: [
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'azure-blue', count: 2 },
+          { color: 'royal-purple', count: 3 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'ruby-red', count: 3 },
+      { color: 'azure-blue', count: 3 },
+      { color: 'emerald-green', count: 3 },
+      { color: 'sunburst-yellow', count: 3 },
+      { color: 'royal-purple', count: 3 },
+    ],
+    objective: {
+      type: 'target_score',
+      description: 'Score 7,000 points to conquer the Quantum Swarm',
+      targetScore: 7000,
+      moveLimit: 28,
+    },
+    starThresholds: [4500, 7000, 9500],
+  },
+
+  // WORLD 7 — GRAND APEX (Levels 31 - 35)
+  {
+    id: 31,
+    worldId: 7,
+    title: 'Astral Gateway',
+    subtitle: 'Triad flow across cosmic rings',
+    difficulty: 5,
+    boardRadius: 2,
+    stackCapacity: 10,
+    availableColors: ['cyan-breeze', 'ruby-red', 'sunburst-yellow'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'cyan-breeze',
+        count: 8,
+        layers: [
+          { color: 'sunburst-yellow', count: 4 },
+          { color: 'cyan-breeze', count: 4 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'ruby-red',
+        count: 7,
+        layers: [
+          { color: 'cyan-breeze', count: 3 },
+          { color: 'ruby-red', count: 4 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'sunburst-yellow',
+        count: 7,
+        layers: [
+          { color: 'ruby-red', count: 3 },
+          { color: 'sunburst-yellow', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'ruby-red',
+        count: 8,
+        layers: [
+          { color: 'sunburst-yellow', count: 4 },
+          { color: 'ruby-red', count: 4 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'ruby-red', count: 5 },
+      { color: 'ruby-red', count: 4 },
+      { color: 'sunburst-yellow', count: 4 },
+      { color: 'sunburst-yellow', count: 4 },
+      { color: 'cyan-breeze', count: 3 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Complete 2 Red, 2 Yellow, and 1 Cyan stack (5 total)',
+      targetColors: { 'ruby-red': 2, 'sunburst-yellow': 2, 'cyan-breeze': 1 },
+      moveLimit: 28,
+    },
+    starThresholds: [4000, 6500, 9000],
+  },
+  {
+    id: 32,
+    worldId: 7,
+    title: 'Nebula Spiral',
+    subtitle: 'Triple locks safeguarding outer perimeter',
+    difficulty: 5,
+    boardRadius: 2,
+    customCells: [
+      { id: '0_2', q: 0, r: 2, isLocked: true, lockRequirement: { type: 'merges', target: 3, current: 0 } },
+      { id: '-2_0', q: -2, r: 0, isLocked: true, lockRequirement: { type: 'merges', target: 3, current: 0 } },
+      { id: '2_-2', q: 2, r: -2, isLocked: true, lockRequirement: { type: 'merges', target: 3, current: 0 } },
+    ],
+    stackCapacity: 10,
+    availableColors: ['tangerine-orange', 'ocean-teal', 'bubblegum-pink', 'royal-purple'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'tangerine-orange',
+        count: 7,
+        layers: [
+          { color: 'royal-purple', count: 3 },
+          { color: 'tangerine-orange', count: 4 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'ocean-teal',
+        count: 7,
+        layers: [
+          { color: 'bubblegum-pink', count: 3 },
+          { color: 'ocean-teal', count: 4 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'bubblegum-pink',
+        count: 7,
+        layers: [
+          { color: 'tangerine-orange', count: 3 },
+          { color: 'bubblegum-pink', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'royal-purple',
+        count: 7,
+        layers: [
+          { color: 'ocean-teal', count: 3 },
+          { color: 'royal-purple', count: 4 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'tangerine-orange', count: 3 },
+      { color: 'ocean-teal', count: 3 },
+      { color: 'bubblegum-pink', count: 3 },
+      { color: 'royal-purple', count: 3 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Unlock the perimeter and complete all 4 color sets',
+      targetColors: { 'tangerine-orange': 1, 'ocean-teal': 1, 'bubblegum-pink': 1, 'royal-purple': 1 },
+      moveLimit: 26,
+    },
+    starThresholds: [4200, 6800, 9200],
+  },
+  {
+    id: 33,
+    worldId: 7,
+    title: 'Celestial Loom',
+    subtitle: 'Four 2x multipliers interlaced in symmetry',
+    difficulty: 5,
+    boardRadius: 2,
+    customCells: [
+      { id: '1_-1', q: 1, r: -1, bonusMultiplier: 2 },
+      { id: '-1_1', q: -1, r: 1, bonusMultiplier: 2 },
+      { id: '1_0', q: 1, r: 0, bonusMultiplier: 2 },
+      { id: '-1_0', q: -1, r: 0, bonusMultiplier: 2 },
+    ],
+    stackCapacity: 10,
+    availableColors: ['azure-blue', 'emerald-green', 'orchid-magenta', 'sunburst-yellow'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'azure-blue',
+        count: 7,
+        layers: [
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'orchid-magenta', count: 2 },
+          { color: 'azure-blue', count: 3 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'emerald-green',
+        count: 7,
+        layers: [
+          { color: 'azure-blue', count: 2 },
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'emerald-green', count: 3 },
+        ],
+      },
+      {
+        cellId: '0_-1',
+        color: 'orchid-magenta',
+        count: 7,
+        layers: [
+          { color: 'emerald-green', count: 2 },
+          { color: 'azure-blue', count: 2 },
+          { color: 'orchid-magenta', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'sunburst-yellow',
+        count: 7,
+        layers: [
+          { color: 'orchid-magenta', count: 2 },
+          { color: 'emerald-green', count: 2 },
+          { color: 'sunburst-yellow', count: 3 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'azure-blue', count: 3 },
+      { color: 'emerald-green', count: 3 },
+      { color: 'orchid-magenta', count: 3 },
+      { color: 'sunburst-yellow', count: 3 },
+    ],
+    objective: {
+      type: 'target_score',
+      description: 'Score 7,500 points using the 4 multiplier conduits',
+      targetScore: 7500,
+      moveLimit: 24,
+    },
+    starThresholds: [4800, 7500, 10000],
+  },
+  {
+    id: 34,
+    worldId: 7,
+    title: 'Chrono Labyrinth',
+    subtitle: 'Obstacles requiring pinpoint routing',
+    difficulty: 5,
+    boardRadius: 2,
+    customCells: [
+      { id: '1_0', q: 1, r: 0, isBlocked: true },
+      { id: '-1_0', q: -1, r: 0, isBlocked: true },
+      { id: '0_2', q: 0, r: 2, isLocked: true, lockRequirement: { type: 'merges', target: 3, current: 0 } },
+    ],
+    stackCapacity: 10,
+    availableColors: ['ruby-red', 'lime-spring', 'ocean-teal', 'cyan-breeze'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'ruby-red',
+        count: 7,
+        layers: [
+          { color: 'cyan-breeze', count: 3 },
+          { color: 'ruby-red', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'ocean-teal',
+        count: 7,
+        layers: [
+          { color: 'lime-spring', count: 3 },
+          { color: 'ocean-teal', count: 4 },
+        ],
+      },
+      {
+        cellId: '0_-1',
+        color: 'lime-spring',
+        count: 7,
+        layers: [
+          { color: 'ocean-teal', count: 3 },
+          { color: 'lime-spring', count: 4 },
+        ],
+      },
+      {
+        cellId: '1_-1',
+        color: 'cyan-breeze',
+        count: 7,
+        layers: [
+          { color: 'ruby-red', count: 3 },
+          { color: 'cyan-breeze', count: 4 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'ruby-red', count: 3 },
+      { color: 'lime-spring', count: 3 },
+      { color: 'ocean-teal', count: 3 },
+      { color: 'cyan-breeze', count: 3 },
+    ],
+    objective: {
+      type: 'complete_colors',
+      description: 'Navigate the labyrinth to complete all 4 color stacks',
+      targetColors: { 'ruby-red': 1, 'lime-spring': 1, 'ocean-teal': 1, 'cyan-breeze': 1 },
+      moveLimit: 22,
+    },
+    starThresholds: [4500, 7000, 9500],
+  },
+  {
+    id: 35,
+    worldId: 7,
+    title: 'The Infinite Zenith',
+    subtitle: 'The grand coronation of the Hexaflow Campaign',
+    difficulty: 5,
+    boardRadius: 2,
+    customCells: [
+      { id: '0_0', q: 0, r: 0, bonusMultiplier: 3 },
+      { id: '0_2', q: 0, r: 2, isLocked: true, lockRequirement: { type: 'merges', target: 4, current: 0 } },
+      { id: '0_-2', q: 0, r: -2, isLocked: true, lockRequirement: { type: 'merges', target: 4, current: 0 } },
+    ],
+    stackCapacity: 10,
+    availableColors: ['ruby-red', 'azure-blue', 'emerald-green', 'sunburst-yellow', 'orchid-magenta'],
+    startingBoard: [
+      {
+        cellId: '0_0',
+        color: 'ruby-red',
+        count: 7,
+        layers: [
+          { color: 'orchid-magenta', count: 2 },
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'ruby-red', count: 3 },
+        ],
+      },
+      {
+        cellId: '1_0',
+        color: 'azure-blue',
+        count: 7,
+        layers: [
+          { color: 'ruby-red', count: 2 },
+          { color: 'emerald-green', count: 2 },
+          { color: 'azure-blue', count: 3 },
+        ],
+      },
+      {
+        cellId: '-1_0',
+        color: 'emerald-green',
+        count: 7,
+        layers: [
+          { color: 'azure-blue', count: 2 },
+          { color: 'orchid-magenta', count: 2 },
+          { color: 'emerald-green', count: 3 },
+        ],
+      },
+      {
+        cellId: '0_1',
+        color: 'sunburst-yellow',
+        count: 7,
+        layers: [
+          { color: 'emerald-green', count: 2 },
+          { color: 'ruby-red', count: 2 },
+          { color: 'sunburst-yellow', count: 3 },
+        ],
+      },
+      {
+        cellId: '0_-1',
+        color: 'orchid-magenta',
+        count: 7,
+        layers: [
+          { color: 'sunburst-yellow', count: 2 },
+          { color: 'azure-blue', count: 2 },
+          { color: 'orchid-magenta', count: 3 },
+        ],
+      },
+    ],
+    incomingPool: [
+      { color: 'ruby-red', count: 3 },
+      { color: 'azure-blue', count: 3 },
+      { color: 'emerald-green', count: 3 },
+      { color: 'sunburst-yellow', count: 3 },
+      { color: 'orchid-magenta', count: 3 },
+    ],
+    objective: {
+      type: 'target_score',
+      description: 'Score 8,500 points to conquer the Apex Campaign!',
+      targetScore: 8500,
+      moveLimit: 30,
+    },
+    starThresholds: [5500, 8500, 12000],
+    tips: 'Utilize the central 3x catalyst cell and unlock both wings to score massive multi-color cascading chains!',
   },
 ];

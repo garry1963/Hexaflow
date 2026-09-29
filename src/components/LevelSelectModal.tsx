@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { X, Lock, Star, Play } from 'lucide-react';
+import { X, Lock, Star, Play, Sparkles } from 'lucide-react';
 import { CAMPAIGN_LEVELS } from '../data/levels';
 import { PlayerProfile } from '../types';
 
@@ -8,20 +8,24 @@ interface LevelSelectModalProps {
   profile: PlayerProfile;
   onSelectLevel: (levelId: number) => void;
   onClose: () => void;
+  onOpenGenerator?: () => void;
 }
 
 export const LevelSelectModal: React.FC<LevelSelectModalProps> = ({
   profile,
   onSelectLevel,
   onClose,
+  onOpenGenerator,
 }) => {
   // Group levels by World
   const worlds = [
     { id: 1, name: 'World 1: Introduction', range: [1, 5] },
     { id: 2, name: 'World 2: Fundamentals', range: [6, 10] },
     { id: 3, name: 'World 3: Strategy', range: [11, 15] },
-    { id: 4, name: 'World 4: Advanced', range: [16, 18] },
-    { id: 5, name: 'World 5: Expert', range: [19, 20] },
+    { id: 4, name: 'World 4: Advanced', range: [16, 20] },
+    { id: 5, name: 'World 5: Crystal Caverns', range: [21, 25] },
+    { id: 6, name: 'World 6: Quantum Swarm', range: [26, 30] },
+    { id: 7, name: 'World 7: Grand Apex', range: [31, 35] },
   ];
 
   return (
@@ -125,6 +129,22 @@ export const LevelSelectModal: React.FC<LevelSelectModalProps> = ({
             );
           })}
         </div>
+
+        {onOpenGenerator && (
+          <div className="pt-3 border-t border-slate-800 mt-2 flex items-center justify-between">
+            <span className="text-xs text-slate-400">Want custom puzzles?</span>
+            <button
+              onClick={() => {
+                onClose();
+                onOpenGenerator();
+              }}
+              className="py-1.5 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-display font-bold flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Puzzle Generator & Archive</span>
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   );
